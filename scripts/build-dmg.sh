@@ -5,14 +5,17 @@
 # A .dmg rather than a .zip because of what a zip does to a first install:
 # double-clicking the app straight out of Downloads runs it from a read-only
 # translocated mirror, which is how people ended up with "Sidenote 2.app",
-# permissions that never stick, and — worst — a new download that silently
-# focused the OLD copy still running from /Applications. A disk image puts the
-# app and an Applications alias side by side and asks for one drag, which is
-# both the convention people recognise and the only path that avoids all of it.
+# permissions that never stuck, and — worst — a new download that silently
+# focused the OLD copy still running from /Applications.
 #
-# Deliberately no AppleScript: every prettier DMG recipe drives Finder to
-# place icons, and that throws an "wants access to control Finder" prompt on
-# the build machine. Layout comes from the window geometry written below.
+# The window is laid out on purpose. An unstyled image is two unlabelled icons
+# in a bare window, where the one thing you are meant to do (drag left onto
+# right) is the one thing nothing says, and double-clicking the app instead
+# runs it off the image — straight back into the trap the DMG exists to avoid.
+#
+# Layout comes from dmgbuild, which writes the .DS_Store itself. Every other
+# recipe drives Finder over AppleScript and throws an automation prompt on the
+# build machine.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -25,6 +28,8 @@ SKIP_NOTARIZE=0
 BUILD="$ROOT/build/mac"
 APP="$BUILD/Sidenote.app"
 DMG="$BUILD/Sidenote.dmg"
+ASSETS="$BUILD/dmg-assets"
+VENV="$ROOT/build/dmgtools"
 
 step() { printf '\n\033[1;34m▸ %s\033[0m\n' "$1"; }
 
@@ -34,22 +39,34 @@ step() { printf '\n\033[1;34m▸ %s\033[0m\n' "$1"; }
 # is inside it.
 codesign --verify --strict "$APP" || { echo "ABORT: $APP is not properly signed" >&2; exit 1; }
 
-step "Staging the disk image…"
-STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
-ditto "$APP" "$STAGE/Sidenote.app"
-ln -s /Applications "$STAGE/Applications"
+step "Preparing dmgbuild…"
+if [[ ! -x "$VENV/bin/dmgbuild" ]]; then
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q dmgbuild
+fi
 
-step "Creating the image…"
+step "Rendering the background…"
+mkdir -p "$ASSETS"
+# Two resolutions stitched into one TIFF, so the window is crisp on a Retina
+# display instead of a blurry upscale.
+node -e "
+const sharp = require('sharp');
+const fs = require('fs');
+const svg = fs.readFileSync('macos/dmg/background.svg');
+(async () => {
+  await sharp(svg, { density: 72 }).png().toFile('$ASSETS/bg.png');
+  await sharp(svg, { density: 144 }).resize(1280, 800).png().toFile('$ASSETS/bg@2x.png');
+})();
+"
+tiffutil -cathidpicheck "$ASSETS/bg.png" "$ASSETS/bg@2x.png" -out "$ASSETS/background.tiff" >/dev/null
+
+step "Building the image…"
 rm -f "$DMG"
-hdiutil create \
-  -volname "Sidenote" \
-  -srcfolder "$STAGE" \
-  -fs HFS+ \
-  -format UDZO \
-  -imagekey zlib-level=9 \
-  -ov -quiet \
-  "$DMG"
+"$VENV/bin/dmgbuild" \
+  -s macos/dmg/settings.py \
+  -D app="$APP" \
+  -D background="$ASSETS/background.tiff" \
+  "Sidenote" "$DMG"
 
 step "Signing the image…"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
