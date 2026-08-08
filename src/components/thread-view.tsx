@@ -21,6 +21,7 @@ import type { Message, SearchResult, Thread } from "@/lib/types";
 import { formatListDate, formatSeparator } from "@/lib/format";
 import { saveMessage } from "@/lib/notes";
 import { ExplainPopover, type ExplainMode } from "@/components/explain-popover";
+import { registerPasteTarget, type Pasted } from "@/lib/clipboard-image";
 import {
   Dialog,
   DialogContent,
@@ -75,6 +76,9 @@ export function ThreadView({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pending, setPending] = useState<{ text: string; at: number }[]>([]);
+  // A screenshot pasted into the composer, sent as an iMessage attachment.
+  const [outgoing, setOutgoing] = useState<Pasted | null>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingScroll = useRef<"bottom" | number | null>("bottom");
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,21 +176,39 @@ export function ThreadView({
   }, [canSend, anchor, threadId, loading]);
 
   useEffect(() => setPending([]), [threadId]);
+  useEffect(() => setOutgoing(null), [threadId]);
+
+  // Paste a screenshot anywhere in the thread and it attaches to the composer.
+  useEffect(() => {
+    if (!canSend) return;
+    return registerPasteTarget({
+      container: () => composerRef.current,
+      onImage: setOutgoing,
+      onError: showFlash,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSend]);
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || sending) return;
+    const image = outgoing;
+    if ((!text && !image) || sending) return;
     setSending(true);
     try {
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threadId, text }),
+        body: JSON.stringify({
+          threadId,
+          text,
+          ...(image ? { image: { data: image.data, mime: image.mime } } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't send.");
       setDraft("");
-      setPending((p) => [...p, { text, at: Date.now() }]);
+      setOutgoing(null);
+      if (text) setPending((p) => [...p, { text, at: Date.now() }]);
       pendingScroll.current = "bottom";
       setMessages((m) => [...m]); // trigger scroll
     } catch (e) {
@@ -525,28 +547,49 @@ export function ThreadView({
       {/* compose */}
       {canSend && (
         <form
-          className="flex shrink-0 items-center gap-2 border-t bg-background p-3"
+          ref={composerRef}
+          className="flex shrink-0 flex-col gap-2 border-t bg-background p-3"
           onSubmit={(e) => {
             e.preventDefault();
             send();
           }}
         >
+          {outgoing && (
+            <div className="flex items-center gap-2 self-start rounded-xl border p-1.5 pr-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={outgoing.url}
+                alt="Pasted screenshot"
+                className="h-14 w-auto rounded-lg object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => setOutgoing(null)}
+                aria-label="Remove image"
+                className="rounded p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={`Message ${thread?.name ?? ""}…`}
+            placeholder={outgoing ? "Add a message…" : `Message ${thread?.name ?? ""}…`}
             disabled={sending}
             className="h-9 rounded-full border-none bg-black/[0.06] shadow-none dark:bg-white/10"
           />
           <Button
             type="submit"
             size="icon"
-            disabled={!draft.trim() || sending}
+            disabled={(!draft.trim() && !outgoing) || sending}
             aria-label="Send message"
             className="size-9 shrink-0 rounded-full bg-[#0a84ff] hover:bg-[#0974df]"
           >
             <ArrowUp className="size-4.5" />
           </Button>
+          </div>
         </form>
       )}
 

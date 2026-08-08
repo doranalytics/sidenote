@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   CircleStop,
-  ImagePlus,
   RefreshCw,
   MessageSquarePlus,
   Pencil,
@@ -27,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { registerPasteTarget, type Pasted } from "@/lib/clipboard-image";
 
 type Entry = { role: "user" | "ai"; text: string };
 type JobState = { running: boolean; done: number; total: number; error?: string } | null;
@@ -36,41 +36,6 @@ type EmbedState = {
   count: number;
   job: JobState;
 };
-type Pasted = { data: string; mime: string; url: string };
-
-// Screenshots off a Retina display are routinely 3-5 MB, which is at or over
-// what the API accepts and costs far more tokens than it needs to. Shrink the
-// long edge to 1568px first — the point past which extra pixels stop buying
-// any accuracy — and re-encode as JPEG.
-const MAX_EDGE = 1568;
-
-function imageFromClipboard(dt: DataTransfer | null): File | null {
-  if (!dt) return null;
-  // WebKit surfaces a pasted screenshot through items; Chromium fills files.
-  // Check both rather than assuming either.
-  for (const item of Array.from(dt.items ?? [])) {
-    if (item.kind === "file" && item.type.startsWith("image/")) {
-      const f = item.getAsFile();
-      if (f) return f;
-    }
-  }
-  return Array.from(dt.files ?? []).find((f) => f.type.startsWith("image/")) ?? null;
-}
-
-async function shrink(file: File): Promise<Pasted> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-  const url = canvas.toDataURL("image/jpeg", 0.85);
-  return { data: url.split(",")[1], mime: "image/jpeg", url };
-}
-
 export function AiPanel({
   threadId,
   threadName,
@@ -267,54 +232,17 @@ export function AiPanel({
     };
   }, [job?.running, threadId]);
 
-  const attach = useCallback(async (file: File | null) => {
-    if (!file) return;
-    try {
-      setImage(await shrink(file));
-    } catch {
-      setError("Couldn't read that image.");
-    }
-  }, []);
-
-  // Paste anywhere in this panel, not just inside the text box — a screenshot
-  // is usually taken with the app unfocused, so requiring focus in one input
-  // made Cmd-V look broken.
+  // Paste a screenshot anywhere in this panel to ask about it. Registered
+  // second so it wins over the message composer while focus is in here.
+  const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (demo) return;
-    type Bridge = { postMessage: (v: unknown) => void };
-    const shell = window as unknown as {
-      webkit?: { messageHandlers?: { clipboardImage?: Bridge } };
-      __sidenoteClipboardImage?: (dataUrl: string | null) => void;
-    };
-
-    // The native shell answers here with a data URL, or null if the pasteboard
-    // held no image after all.
-    shell.__sidenoteClipboardImage = (dataUrl) => {
-      if (!dataUrl) return;
-      fetch(dataUrl)
-        .then((r) => r.blob())
-        .then((b) => attach(new File([b], "screenshot.png", { type: b.type })))
-        .catch(() => setError("Couldn't read that image."));
-    };
-
-    const onPaste = (e: ClipboardEvent) => {
-      const file = imageFromClipboard(e.clipboardData);
-      if (file) {
-        e.preventDefault();
-        void attach(file);
-        return;
-      }
-      // No image in the event. In WKWebView that's expected when focus sits in
-      // a plain text field, so ask the shell to read NSPasteboard directly.
-      // Don't preventDefault — a normal text paste has to keep working.
-      shell.webkit?.messageHandlers?.clipboardImage?.postMessage(null);
-    };
-    document.addEventListener("paste", onPaste);
-    return () => {
-      document.removeEventListener("paste", onPaste);
-      delete shell.__sidenoteClipboardImage;
-    };
-  }, [attach, demo]);
+    return registerPasteTarget({
+      container: () => panelRef.current,
+      onImage: setImage,
+      onError: setError,
+    });
+  }, [demo]);
 
   const run = async (mode: "summarize" | "ask", q?: string) => {
     if (busy) return;
@@ -438,7 +366,7 @@ export function AiPanel({
 
   // ---------- ready ----------
   return (
-    <div className="flex h-full flex-col">
+    <div ref={panelRef} className="flex h-full flex-col">
       {/* chat switcher */}
       <div className="relative flex shrink-0 items-center gap-1 border-b px-2 py-2">
         <button
@@ -632,21 +560,6 @@ export function AiPanel({
           run("ask", q || "What is this?");
         }}
       >
-        <label
-          title="Attach a screenshot"
-          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/10"
-        >
-          <ImagePlus className="size-4" />
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              void attach(e.target.files?.[0] ?? null);
-              e.target.value = "";
-            }}
-          />
-        </label>
         <Input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
