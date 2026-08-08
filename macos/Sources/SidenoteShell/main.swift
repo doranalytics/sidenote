@@ -465,6 +465,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         // downloadable binary, so it is a speed bump against casual abuse — the
         // relay's rate limit is what actually bounds the damage.
         env["SIDENOTE_CLIENT_SECRET"] = "sn_9b9e9cbecf3af566bc479abdc60259e7"
+        // PostHog project key. Public by design — it only permits writing
+        // events, which is why it can ship inside the app at all.
+        env["POSTHOG_KEY"] = "phc_nHSTwtG8aoUuMsoSXbrFnB6xuCQCViuvddJStzdcgjZT"
         // The bundle is what macOS lists under Full Disk Access — the UI needs
         // its real path, not the node binary buried inside it.
         env["SIDENOTE_APP_PATH"] = trueBundleURL.path
