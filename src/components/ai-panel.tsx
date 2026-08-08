@@ -84,15 +84,40 @@ export function AiPanel({
   const [embed, setEmbed] = useState<EmbedState | null>(null);
   const [job, setJob] = useState<JobState>(null);
   const [image, setImage] = useState<Pasted | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  // The conversation whose answer is being generated right now, or null.
+  // Generation lives on the server, so this is a subscription, not ownership.
+  const [watching, setWatching] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  /** If an answer for this chat is still being generated on the server, pick
+   *  it back up. This is what makes leaving the panel mid-question safe: the
+   *  work never belonged to the panel, so there is something to return to. */
+  const resume = useCallback(async (convId: string) => {
+    try {
+      const s = (await fetch(`/api/ai?key=${encodeURIComponent(convId)}`, {
+        cache: "no-store",
+      }).then((r) => r.json())) as { running: boolean; text: string; prompt?: string };
+      if (!s.running) return;
+      setEntries((e) => [
+        ...e,
+        ...(s.prompt ? [{ role: "user" as const, text: s.prompt }] : []),
+        { role: "ai" as const, text: s.text ?? "" },
+      ]);
+      setBusy(true);
+      setWatching(convId);
+    } catch {
+      // nothing in flight, or the server restarted — the vault has the rest
+    }
+  }, []);
 
   // Open the thread's most recent AI chat. Chats are per iMessage thread and
   // live in ~/.sidenote/vault.db, so switching away and back keeps them.
   useEffect(() => {
     if (demo) return;
     let cancelled = false;
-    abortRef.current?.abort();
+    // Stop following, but leave the answer generating — it finishes and saves
+    // itself, and is here when you come back.
+    setWatching(null);
     setBusy(false);
     setError(null);
     setEntries([]);
@@ -110,6 +135,7 @@ export function AiPanel({
           if (cancelled) return;
           setCurrentId(list[0].id);
           setEntries(messages.map((m) => ({ role: m.role, text: m.text })));
+          void resume(list[0].id);
         }
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
@@ -130,7 +156,7 @@ export function AiPanel({
     return () => {
       cancelled = true;
     };
-  }, [threadId, demo]);
+  }, [threadId, demo, resume]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -138,7 +164,7 @@ export function AiPanel({
   }, [entries]);
 
   const openConversation = useCallback(async (id: string) => {
-    abortRef.current?.abort();
+    setWatching(null);
     setBusy(false);
     setPickerOpen(false);
     setError(null);
@@ -146,13 +172,14 @@ export function AiPanel({
       const { messages } = await loadConversation(id);
       setCurrentId(id);
       setEntries(messages.map((m) => ({ role: m.role, text: m.text })));
+      void resume(id);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, []);
+  }, [resume]);
 
   const startNewChat = useCallback(() => {
-    abortRef.current?.abort();
+    setWatching(null);
     setBusy(false);
     setPickerOpen(false);
     setError(null);
@@ -276,8 +303,6 @@ export function AiPanel({
       },
       { role: "ai", text: "" },
     ]);
-    const controller = new AbortController();
-    abortRef.current = controller;
     try {
       const res = await fetch("/api/ai", {
         method: "POST",
@@ -289,36 +314,65 @@ export function AiPanel({
           conversationId,
           ...(attached ? { image: { data: attached.data, mime: attached.mime } } : {}),
         }),
-        signal: controller.signal,
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         throw new Error(data?.error ?? "AI request failed.");
       }
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        setEntries((e) => {
-          const copy = [...e];
-          copy[copy.length - 1] = { role: "ai", text: copy[copy.length - 1].text + chunk };
-          return copy;
-        });
-      }
-      // The server just retitled and reordered this chat as it saved.
-      listConversations(threadId).then(setConversations).catch(() => {});
+      // The answer is generated server-side and survives this panel closing;
+      // watching it is just polling for how far it has got.
+      setWatching(conversationId);
     } catch (e) {
-      if ((e as Error).name !== "AbortError") {
-        setError((e as Error).message);
-        setEntries((en) => (en[en.length - 1]?.text === "" ? en.slice(0, -2) : en));
-      }
-    } finally {
+      setError((e as Error).message);
+      setEntries((en) => (en[en.length - 1]?.text === "" ? en.slice(0, -2) : en));
       setBusy(false);
-      abortRef.current = null;
     }
   };
+
+  // Follow an answer that is being generated. Mounting with a job already in
+  // flight picks it back up, which is what makes leaving the panel — or the
+  // thread — safe mid-question.
+  useEffect(() => {
+    if (!watching) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const s = (await fetch(`/api/ai?key=${encodeURIComponent(watching)}`, {
+          cache: "no-store",
+        }).then((r) => r.json())) as {
+          running: boolean;
+          text: string;
+          error?: string;
+          missing?: boolean;
+        };
+        if (!alive) return;
+        if (s.text) {
+          setEntries((e) => {
+            const copy = [...e];
+            if (copy[copy.length - 1]?.role === "ai") {
+              copy[copy.length - 1] = { role: "ai", text: s.text };
+            }
+            return copy;
+          });
+        }
+        if (!s.running) {
+          if (s.error) setError(s.error);
+          setBusy(false);
+          setWatching(null);
+          // The server retitled and reordered this chat as it saved.
+          listConversations(threadId).then(setConversations).catch(() => {});
+        }
+      } catch {
+        // transient — next tick
+      }
+    };
+    void tick();
+    const t = setInterval(tick, 350);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [watching, threadId]);
 
   // ---------- not registered yet ----------
   if (!demo && !registered) {
@@ -582,7 +636,13 @@ export function AiPanel({
             type="button"
             size="icon"
             variant="ghost"
-            onClick={() => abortRef.current?.abort()}
+            onClick={() => {
+              if (watching) {
+                void fetch(`/api/ai?key=${encodeURIComponent(watching)}`, {
+                  method: "DELETE",
+                }).catch(() => {});
+              }
+            }}
             aria-label="Stop"
           >
             <CircleStop className="size-5 text-[#0a84ff]" />
