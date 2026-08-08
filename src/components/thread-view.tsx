@@ -466,12 +466,42 @@ export function ThreadView({
                         });
                       }}
                       className={cn(
-                        "relative flex max-w-[78%] flex-col gap-1 md:max-w-[65%]",
+                        "group relative flex max-w-[78%] flex-col gap-1 md:max-w-[65%]",
                         m.isFromMe ? "items-end" : "items-start",
                         // room for the tapbacks, which sit above the top edge
                         m.reactions?.length && "mt-3"
                       )}
                     >
+                      {/* Right-click is the whole feature and nothing about a
+                          message bubble advertises it. In the demo — where the
+                          entire point is showing what Sidenote does to someone
+                          who has never seen it — the hint appears on hover, and
+                          is itself clickable so a trackpad without a
+                          right-click configured isn't a dead end. */}
+                      {demo && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setMenu({
+                              x: Math.min(r.left, window.innerWidth - 216),
+                              y: Math.min(r.bottom + 4, window.innerHeight - 216),
+                              m,
+                            });
+                          }}
+                          className={cn(
+                            "absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-1",
+                            "rounded-full border border-black/[0.08] bg-background px-2 py-1",
+                            "text-[10.5px] font-medium whitespace-nowrap text-muted-foreground shadow-sm",
+                            "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
+                            "hover:text-[#0a84ff] dark:border-white/10",
+                            m.isFromMe ? "right-full mr-2" : "left-full ml-2"
+                          )}
+                        >
+                          <Sparkles className="size-3 text-[#0a84ff]" />
+                          Right-click to ask
+                        </button>
+                      )}
                       {!!m.reactions?.length && (
                         <div
                           className={cn(
