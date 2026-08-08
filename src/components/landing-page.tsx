@@ -52,19 +52,19 @@ function AlreadyInstalled({ running }: { running: boolean | null }) {
       <p className="mt-1.5 text-[13px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
         Latest version is{" "}
         <span className="font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">{latest.date}</span> —{" "}
-        {latest.title.charAt(0).toLowerCase() + latest.title.slice(1)}. Sidenote updates itself —
-        open it and click the banner. Your messages, notes, and pins stay put.
+        {latest.title.charAt(0).toLowerCase() + latest.title.slice(1)}. Open Sidenote and click the
+        banner at the top; it installs the update itself. Your messages, notes, and pins stay put.
       </p>
-      <Button
-        asChild
-        size="sm"
-        className="mt-3 h-9 rounded-full bg-[#0a84ff] px-4 text-[13px] hover:bg-[#0974df]"
+      {/* No download button here on purpose. Offering one to someone who
+          already has the app is how you end up with a second copy in
+          Downloads and a first-launch flow they did not need. */}
+      <a
+        href={DOWNLOAD_URL}
+        download
+        className="mt-2.5 inline-block text-[12px] text-[#6e6e73] underline underline-offset-2 hover:text-[#1d1d1f] dark:text-[#a1a1a6] dark:hover:text-[#f5f5f7]"
       >
-        <a href={DOWNLOAD_URL} download>
-          <Download className="mr-1.5 size-3.5" />
-          Download the latest
-        </a>
-      </Button>
+        Or download it again
+      </a>
     </div>
   );
 }

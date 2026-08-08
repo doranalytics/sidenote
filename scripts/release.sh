@@ -36,7 +36,7 @@ VERSION="$(date +%Y.%-m.%-d)"
 BUILD_NUM="$(git rev-list --count HEAD)"
 TAG="v$VERSION-$BUILD_NUM"
 
-step "Publishing $TAG to $REPO…"
+step "Publishing ${TAG} to ${REPO}…"
 if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
   gh release upload "$TAG" "$DMG" "$ZIP" --repo "$REPO" --clobber
 else
