@@ -6,6 +6,7 @@ import type { Message } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Markdown, toPlainText } from "@/components/markdown";
 
 export type ExplainMode = "explain" | "lookup" | "reply";
 
@@ -147,7 +148,9 @@ export function ExplainPopover({
   const answer = turns.filter((t) => t.role === "ai").at(-1)?.text ?? "";
 
   const copy = () => {
-    navigator.clipboard.writeText(answer);
+    // Strip the markup on the way out — this text is headed for a message box,
+    // which will show "**birthday**" literally.
+    navigator.clipboard.writeText(toPlainText(answer));
     setCopied(true);
     setTimeout(() => setCopied(false), 1400);
   };
@@ -190,8 +193,10 @@ export function ExplainPopover({
                 {t.text}
               </p>
             ) : (
-              <p key={i} className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
-                {t.text ||
+              <div key={i} className="text-[13.5px] leading-relaxed">
+                {t.text ? (
+                  <Markdown text={t.text} />
+                ) : (
                   (busy && i === turns.length - 1 ? (
                     <span className="inline-flex gap-1 py-1">
                       <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:0ms]" />
@@ -200,8 +205,9 @@ export function ExplainPopover({
                     </span>
                   ) : (
                     ""
-                  ))}
-              </p>
+                  ))
+                )}
+              </div>
             )
           )}
 

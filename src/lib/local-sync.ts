@@ -22,6 +22,120 @@ const ADDRESSBOOK_DIR = path.join(
   "AddressBook"
 );
 
+// ---------------------------------------------------------------- tapbacks
+//
+// Hearts, thumbs-up and the rest are not properties of a message in Apple's
+// schema — each one is its OWN row in `message`, pointing at its target
+// through `associated_message_guid`. The main message query filters those rows
+// out (they have no text and would show as blank bubbles), which is why they
+// have to be collected separately and re-attached here.
+//
+// The guid carries a part prefix — "p:0/UUID" on a normal message, "bp:UUID"
+// on some older ones — so it has to be stripped before it will match
+// `message.guid`.
+export const REACTIONS_SCHEMA = `
+    CREATE TABLE IF NOT EXISTS reactions(
+      id INTEGER PRIMARY KEY, message_id INT, kind TEXT, emoji TEXT,
+      sender TEXT, is_from_me INT, date INT
+    );
+    CREATE INDEX IF NOT EXISTS idx_react_msg ON reactions(message_id);
+`;
+
+// 2000-2006 add a tapback; 3000-3006 take the same one back.
+const TAPBACKS: Record<number, { kind: string; emoji: string }> = {
+  0: { kind: "love", emoji: "❤️" },
+  1: { kind: "like", emoji: "👍" },
+  2: { kind: "dislike", emoji: "👎" },
+  3: { kind: "laugh", emoji: "😂" },
+  4: { kind: "emphasize", emoji: "‼️" },
+  5: { kind: "question", emoji: "❓" },
+};
+
+const TAPBACK_SQL = `
+  SELECT t.ROWID as id, t.associated_message_type as type,
+         t.associated_message_emoji as custom, t.is_from_me, t.date,
+         h.id as handle, target.ROWID as target_id
+  FROM message t
+  JOIN message target ON target.guid = CASE
+        WHEN instr(t.associated_message_guid, '/') > 0
+        THEN substr(t.associated_message_guid, instr(t.associated_message_guid, '/') + 1)
+        ELSE replace(t.associated_message_guid, 'bp:', '') END
+  LEFT JOIN handle h ON h.ROWID = t.handle_id
+  WHERE t.associated_message_type BETWEEN 2000 AND 3999`;
+
+type TapRow = {
+  id: number;
+  type: number;
+  custom: string | null;
+  is_from_me: number;
+  date: number;
+  handle: string | null;
+  target_id: number;
+};
+
+/** Copy tapbacks across for messages already in the index. `sinceRowid` limits
+ *  the scan on a live tick; pass 0 to take everything. Returns rows applied. */
+function syncReactions(
+  src: DatabaseType.Database,
+  out: DatabaseType.Database,
+  names: Map<string, string>,
+  sinceRowid = 0
+): number {
+  let rows: TapRow[];
+  try {
+    rows = src
+      .prepare(sinceRowid ? `${TAPBACK_SQL} AND t.ROWID > ?` : TAPBACK_SQL)
+      .all(...(sinceRowid ? [sinceRowid] : [])) as TapRow[];
+  } catch {
+    // associated_message_emoji only exists on macOS 14+. Reactions are
+    // decoration; an older schema must not take the whole sync down.
+    return 0;
+  }
+  if (!rows.length) return 0;
+
+  const known = out.prepare("SELECT 1 FROM messages WHERE id = ?");
+  const add = out.prepare(
+    `INSERT OR REPLACE INTO reactions(id, message_id, kind, emoji, sender, is_from_me, date)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
+  // A removal names the tapback it undoes only by (target, kind, sender), so
+  // that triple is what gets deleted rather than a row id.
+  const remove = out.prepare(
+    `DELETE FROM reactions
+     WHERE message_id = ? AND kind = ? AND COALESCE(sender, '') = ? AND is_from_me = ?`
+  );
+
+  let applied = 0;
+  // Oldest first, so a later removal always lands after the add it cancels.
+  rows.sort((a, b) => a.date - b.date);
+  for (const r of rows) {
+    if (!known.get(r.target_id)) continue; // target lives in a chat we skipped
+    const removing = r.type >= 3000;
+    const slot = r.type % 1000;
+    const spec = TAPBACKS[slot];
+    // Slot 6 is a free-form emoji tapback, which only the sender's own copy of
+    // the string can describe.
+    const kind = spec ? spec.kind : "emoji";
+    const emoji = spec ? spec.emoji : (r.custom ?? "❤️");
+    if (!spec && slot !== 6) continue; // unknown future tapback type
+    const sender = r.is_from_me || !r.handle ? "" : resolveName(r.handle, names);
+    if (removing) remove.run(r.target_id, kind, sender, r.is_from_me ? 1 : 0);
+    else {
+      add.run(
+        r.id,
+        r.target_id,
+        kind,
+        emoji,
+        sender,
+        r.is_from_me ? 1 : 0,
+        appleToUnixMs(r.date)
+      );
+    }
+    applied++;
+  }
+  return applied;
+}
+
 const APPLE_EPOCH_MS = 978307200000; // 2001-01-01 in unix ms
 
 function appleToUnixMs(d: number): number {
@@ -354,6 +468,7 @@ export function runSync(): { threads: number; messages: number } {
     );
     CREATE INDEX idx_att_msg ON attachments(message_id);
     CREATE TABLE avatars(name TEXT PRIMARY KEY, data BLOB);
+    ${REACTIONS_SCHEMA}
     CREATE VIRTUAL TABLE messages_fts USING fts5(text, content='messages', content_rowid='id');
   `);
 
@@ -446,6 +561,8 @@ export function runSync(): { threads: number; messages: number } {
     `);
   });
   insertAll();
+  // After the messages exist, so every tapback has a target to attach to.
+  out.transaction(() => syncReactions(src, out, contacts.names))();
 
   out
     .prepare("INSERT OR REPLACE INTO meta(key, value) VALUES ('lastSync', ?)")
@@ -524,6 +641,7 @@ export function runIncrementalSync(): number {
       );
       CREATE INDEX IF NOT EXISTS idx_att_msg ON attachments(message_id);
       CREATE TABLE IF NOT EXISTS avatars(name TEXT PRIMARY KEY, data BLOB);
+      ${REACTIONS_SCHEMA}
     `);
     try {
       out.exec("ALTER TABLE messages ADD COLUMN date_read INT DEFAULT 0");
@@ -554,6 +672,34 @@ export function runIncrementalSync(): number {
       /* receipts are decoration — never block the sync */
     }
 
+    // Tapbacks arrive as rows of their own, usually with no new message beside
+    // them — someone hearts a text from yesterday — so this gets its own
+    // watermark and runs on every tick, including the no-new-messages one.
+    // With no watermark yet, it sweeps from zero: that is the one-time
+    // backfill that gives an existing install its whole reaction history.
+    const runReactions = () => {
+      try {
+        const mark = out.prepare("SELECT value FROM meta WHERE key = 'maxReactionRowid'").get() as
+          | { value: string }
+          | undefined;
+        const since = mark ? Number(mark.value) : 0;
+        const top = (
+          src.prepare("SELECT COALESCE(MAX(ROWID), 0) as m FROM message").get() as { m: number }
+        ).m;
+        if (top <= since) return;
+        if (!contactsCache) contactsCache = loadContacts();
+        const names = contactsCache.names;
+        out.transaction(() => {
+          syncReactions(src, out, names, since);
+          out.prepare(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('maxReactionRowid', ?)"
+          ).run(String(top));
+        })();
+      } catch {
+        /* reactions are decoration — never block the sync */
+      }
+    };
+
     type NewRow = {
       id: number;
       text: string | null;
@@ -577,7 +723,10 @@ export function runIncrementalSync(): number {
          ORDER BY m.ROWID ASC LIMIT 500`
       )
       .all(maxRowid) as NewRow[];
-    if (rows.length === 0) return 0;
+    if (rows.length === 0) {
+      runReactions();
+      return 0;
+    }
     if (!contactsCache) contactsCache = loadContacts();
     const contacts = contactsCache;
 
@@ -669,6 +818,7 @@ export function runIncrementalSync(): number {
       }
     });
     apply();
+    runReactions();
     if (fresh.length) void embedFresh(fresh);
   } finally {
     src.close();

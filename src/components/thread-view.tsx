@@ -17,7 +17,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { Message, SearchResult, Thread } from "@/lib/types";
+import type { Message, Reaction, SearchResult, Thread } from "@/lib/types";
 import { formatListDate, formatSeparator } from "@/lib/format";
 import { saveMessage } from "@/lib/notes";
 import { ExplainPopover, type ExplainMode } from "@/components/explain-popover";
@@ -466,10 +466,35 @@ export function ThreadView({
                         });
                       }}
                       className={cn(
-                        "flex max-w-[78%] flex-col gap-1 md:max-w-[65%]",
-                        m.isFromMe ? "items-end" : "items-start"
+                        "relative flex max-w-[78%] flex-col gap-1 md:max-w-[65%]",
+                        m.isFromMe ? "items-end" : "items-start",
+                        // room for the tapbacks, which sit above the top edge
+                        m.reactions?.length && "mt-3"
                       )}
                     >
+                      {!!m.reactions?.length && (
+                        <div
+                          className={cn(
+                            "absolute -top-3 z-10 flex gap-0.5",
+                            m.isFromMe ? "-left-2 flex-row-reverse" : "-right-2"
+                          )}
+                        >
+                          {groupReactions(m.reactions).map((r) => (
+                            <span
+                              key={r.kind + r.emoji}
+                              title={r.who}
+                              className="flex items-center gap-0.5 rounded-full border border-black/[0.06] bg-background px-1.5 py-[3px] text-[11px] leading-none shadow-sm dark:border-white/10"
+                            >
+                              <span>{r.emoji}</span>
+                              {r.count > 1 && (
+                                <span className="font-medium text-muted-foreground">
+                                  {r.count}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {m.attachments
                         ?.filter((a) => a.mime.startsWith("image/"))
                         .map((a) => (
@@ -801,6 +826,27 @@ function ExportDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+// ---------- tapbacks ----------
+
+/** Collapse a message's tapbacks into one chip per emoji, the way Messages
+ *  does: three hearts read as ❤️3, and the tooltip says who left them. */
+function groupReactions(
+  reactions: Reaction[]
+): { kind: string; emoji: string; count: number; who: string }[] {
+  const byEmoji = new Map<string, { kind: string; emoji: string; names: string[] }>();
+  for (const r of reactions) {
+    const entry = byEmoji.get(r.emoji) ?? { kind: r.kind, emoji: r.emoji, names: [] };
+    entry.names.push(r.isFromMe ? "You" : r.sender || "Them");
+    byEmoji.set(r.emoji, entry);
+  }
+  return [...byEmoji.values()].map((e) => ({
+    kind: e.kind,
+    emoji: e.emoji,
+    count: e.names.length,
+    who: e.names.join(", "),
+  }));
 }
 
 // ---------- link previews ----------

@@ -216,6 +216,19 @@ export function friendlyError(e: Error): string {
   if (status === 400 && /credit|balance/i.test(e.message)) {
     return "Your Anthropic account is out of credit.";
   }
+  if (status === 404) {
+    // The relay answered with something that isn't the API. This is what a
+    // sidenote.lol deploy that lost /api/anthropic looks like from in here.
+    return "Sidenote's AI service isn't reachable right now. Try again in a few minutes.";
+  }
   if (status && status >= 500) return "Anthropic is having trouble. Try again shortly.";
-  return e.message || "Something went wrong.";
+  // Whatever is left came from the SDK, and when a response wasn't JSON the
+  // SDK puts the raw body in the message — which once printed an entire HTML
+  // error page into the answer bubble. Anything that looks like markup, or is
+  // simply too long to be a sentence, gets replaced rather than shown.
+  const msg = (e.message ?? "").trim();
+  if (!msg || msg.length > 300 || /<\/?[a-z!][\s\S]*>/i.test(msg)) {
+    return "Something went wrong talking to the AI. Try again.";
+  }
+  return msg;
 }

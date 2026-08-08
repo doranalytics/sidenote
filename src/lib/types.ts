@@ -14,6 +14,15 @@ export type Attachment = {
   name: string;
 };
 
+/** A tapback. `emoji` is what to draw; `kind` is the six built-in slots plus
+ *  "emoji" for the free-form ones macOS 14 added. */
+export type Reaction = {
+  kind: string;
+  emoji: string;
+  sender: string; // display name ("" when from me)
+  isFromMe: boolean;
+};
+
 export type Message = {
   id: number;
   threadId: string;
@@ -23,6 +32,7 @@ export type Message = {
   text: string; // "" for attachment-only messages
   dateRead?: number; // unix ms — when the recipient read it (outgoing only)
   attachments?: Attachment[];
+  reactions?: Reaction[];
 };
 
 export type SearchResult = {

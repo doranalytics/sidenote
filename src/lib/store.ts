@@ -1,6 +1,6 @@
 import fs from "fs";
 import type DatabaseType from "better-sqlite3";
-import type { AppStatus, Message, SearchResult, Thread } from "./types";
+import type { AppStatus, Message, Reaction, SearchResult, Thread } from "./types";
 import { demoMessages, demoThreads } from "./demo-data";
 
 export const isDemo =
@@ -215,6 +215,9 @@ export function getMessages(
 
 // Decorate a page of messages with their attachments in one query.
 // Older indexes (pre-attachments) just return the messages unchanged.
+/** Everything a page of messages needs beyond its own row: files and
+ *  tapbacks. Each pass is independent — a page with no attachments still has
+ *  to get its reactions. */
 function attachMedia(db: Db, messages: Message[]): Message[] {
   if (messages.length === 0) return messages;
   try {
@@ -229,7 +232,6 @@ function attachMedia(db: Db, messages: Message[]): Message[] {
       mime: string;
       name: string;
     }[];
-    if (rows.length === 0) return messages;
     const byMsg = new Map<number, { id: number; mime: string; name: string }[]>();
     for (const r of rows) {
       const list = byMsg.get(r.message_id) ?? [];
@@ -243,7 +245,47 @@ function attachMedia(db: Db, messages: Message[]): Message[] {
   } catch {
     // attachments table missing — re-sync will add it
   }
+  attachReactions(db, messages);
   return messages;
+}
+
+/** Hang tapbacks off the messages they belong to. Same shape as attachMedia:
+ *  one query for the whole page, and a missing table is survivable. */
+function attachReactions(db: Db, messages: Message[]): void {
+  if (messages.length === 0) return;
+  try {
+    const rows = db
+      .prepare(
+        `SELECT message_id, kind, emoji, sender, is_from_me FROM reactions
+         WHERE message_id IN (${messages.map(() => "?").join(",")})
+         ORDER BY date ASC`
+      )
+      .all(...messages.map((m) => m.id)) as {
+      message_id: number;
+      kind: string;
+      emoji: string;
+      sender: string | null;
+      is_from_me: number;
+    }[];
+    if (rows.length === 0) return;
+    const byMsg = new Map<number, Reaction[]>();
+    for (const r of rows) {
+      const list = byMsg.get(r.message_id) ?? [];
+      list.push({
+        kind: r.kind,
+        emoji: r.emoji,
+        sender: r.sender ?? "",
+        isFromMe: !!r.is_from_me,
+      });
+      byMsg.set(r.message_id, list);
+    }
+    for (const m of messages) {
+      const list = byMsg.get(m.id);
+      if (list) m.reactions = list;
+    }
+  } catch {
+    // reactions table missing — the next sync creates and backfills it
+  }
 }
 
 export function getAvatar(name: string): { data: Buffer; mime: string } | null {

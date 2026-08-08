@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { registerPasteTarget, type Pasted } from "@/lib/clipboard-image";
+import { Markdown } from "@/components/markdown";
 
 type Entry = { role: "user" | "ai"; text: string };
 type JobState = { running: boolean; done: number; total: number; error?: string } | null;
@@ -508,13 +509,21 @@ export function AiPanel({
             <div key={i} className={cn("flex", e.role === "user" ? "justify-end" : "justify-start")}>
               <div
                 className={cn(
-                  "max-w-[90%] rounded-2xl px-3.5 py-2 text-[13.5px] leading-relaxed whitespace-pre-wrap",
+                  "max-w-[90%] rounded-2xl px-3.5 py-2 text-[13.5px] leading-relaxed",
+                  // The user's own question is literal text; only the answer
+                  // comes back as markdown.
                   e.role === "user"
-                    ? "bg-[#0a84ff] text-white"
+                    ? "bg-[#0a84ff] whitespace-pre-wrap text-white"
                     : "bg-black/[0.05] dark:bg-white/[0.08]"
                 )}
               >
-                {e.text ||
+                {e.text ? (
+                  e.role === "ai" ? (
+                    <Markdown text={e.text} />
+                  ) : (
+                    e.text
+                  )
+                ) : (
                   (busy && i === entries.length - 1 ? (
                     <span className="inline-flex gap-1 py-1">
                       <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:0ms]" />
@@ -523,7 +532,8 @@ export function AiPanel({
                     </span>
                   ) : (
                     ""
-                  ))}
+                  ))
+                )}
               </div>
             </div>
           ))
