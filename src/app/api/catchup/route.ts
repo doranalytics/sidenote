@@ -31,6 +31,8 @@ function startJob(threadId: string, messages: { id: number; text: string }[]) {
   const job: Job = {
     threadId,
     done: 0,
+    // Replaced by the first progress callback with the true embeddable count;
+    // this is just so the bar has a sane denominator before that arrives.
     total: messages.length,
     running: true,
     startedAt: Date.now(),

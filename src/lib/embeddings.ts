@@ -114,9 +114,16 @@ export async function catchUpThread(
       (r) => r.message_id
     )
   );
-  const todo = messages.filter((m) => !have.has(m.id) && m.text.trim().length > 1);
+  // Progress is reported against the WHOLE conversation, not the work left to
+  // do. A resumed embed only has the remainder to process, and counting that
+  // made a finished 42,000-message thread report "5,707 of 5,707" — which
+  // reads as though 36,000 messages were skipped.
+  const embeddable = messages.filter((m) => m.text.trim().length > 1);
+  const todo = embeddable.filter((m) => !have.has(m.id));
+  const already = embeddable.length - todo.length;
   const total = todo.length;
   if (!total) {
+    onProgress?.({ done: embeddable.length, total: embeddable.length });
     markCaughtUp(threadId, messages.length);
     return 0;
   }
@@ -140,7 +147,10 @@ export async function catchUpThread(
         blob: toBlob(out.data.subarray(j * DIMS, (j + 1) * DIMS) as Float32Array),
       }))
     );
-    onProgress?.({ done: Math.min(i + BATCH, total), total });
+    onProgress?.({
+      done: already + Math.min(i + BATCH, total),
+      total: embeddable.length,
+    });
   }
   markCaughtUp(threadId, messages.length);
   return total;
