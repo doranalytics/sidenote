@@ -105,7 +105,6 @@ export function SidenoteApp() {
     return () => clearInterval(t);
   }, [status?.mode, status?.synced, status?.lastSync]);
 
-  // Check for a newer Sidenote once per app load (local installs only).
   useEffect(() => {
     if (status?.mode !== "local") return;
     fetch("/api/catchup")
@@ -116,10 +115,35 @@ export function SidenoteApp() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setDismissed(d.dismissed))
       .catch(() => {});
-    fetch("/api/update")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((u: UpdateInfo | null) => u && setUpdate(u))
-      .catch(() => {});
+  }, [status?.mode]);
+
+  // Watch for a newer Sidenote (local installs only). This used to run once at
+  // app load, which meant a copy left open all day never noticed a release —
+  // the banner only appeared after a restart, or after hitting Check in
+  // Settings. Sidenote is an app people leave running, so it re-checks on a
+  // timer. The route caches for ten minutes, so the half-hour tick costs at
+  // most one small request an hour.
+  useEffect(() => {
+    if (status?.mode !== "local") return;
+    let alive = true;
+    const look = () =>
+      fetch("/api/update")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((u: UpdateInfo | null) => {
+          if (alive && u) setUpdate(u);
+        })
+        .catch(() => {});
+    look();
+    const t = setInterval(look, 30 * 60_000);
+    // Coming back to a window that has been in the background for hours is the
+    // moment a stale version is most likely, and most worth saying so.
+    const onFocus = () => look();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      alive = false;
+      clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [status?.mode]);
 
   // A thread finishing its catch-up badges immediately in the sidebar.
