@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
       messages,
       tools: [search],
       webSearch: !!body.web || body.mode === "lookup",
+      feature: body.web && body.mode !== "lookup" ? `${body.mode}_web` : body.mode,
       maxTokens: body.mode === "reply" ? 500 : 900,
       signal: req.signal,
     });

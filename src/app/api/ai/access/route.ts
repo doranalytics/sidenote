@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isDemo } from "@/lib/store";
 import { getInstallToken, hasOwnKey, setInstallToken } from "@/lib/claude";
+import { track } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,8 @@ export async function POST(req: NextRequest) {
       );
     }
     setInstallToken(data.token);
+    // After the token is stored, so the event carries the new install id.
+    track("code_redeemed", {});
     return NextResponse.json(shape());
   } catch {
     return NextResponse.json(

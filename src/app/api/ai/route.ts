@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
       messages: [...history, turn],
       tools: [search],
       maxTokens: 2000,
+      feature: body.mode === "summarize" ? "summarize" : "thread_question",
       signal: req.signal,
       onDone: (answer) => {
         // Written server-side once the tokens are out, so the answer lands in

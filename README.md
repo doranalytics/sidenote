@@ -75,5 +75,16 @@ web** additionally sends the search terms Claude writes. Your API key is stored
 in the vault and never leaves your machine. With no key configured, no message
 ever goes anywhere.
 
+**Analytics.** Sidenote reports anonymous usage from the app: that it opened,
+that a sync finished and how many messages it covered, that a conversation was
+embedded, that a search ran and how many results it returned, and what each AI
+call cost. It is keyed to a random per-install id, not to you.
+
+It never includes message text, contact names, phone numbers, thread names,
+note contents, or search queries — only counts, durations, and feature names.
+All of it goes through `src/lib/analytics.ts` and the AI relay, so there is
+exactly one place to audit. The website (sidenote.lol) uses ordinary web
+analytics; the app does not load any tracking script into its own pages.
+
 The deployed demo contains only fictional sample data and stores its throwaway
 notes in the browser.

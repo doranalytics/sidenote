@@ -251,7 +251,8 @@ export function LandingPage() {
       </main>
 
       <footer className="pb-10 text-center text-[12px] text-[#6e6e73] dark:text-[#a1a1a6]">
-        Made for macOS · Your messages are indexed and searched on your Mac · AI is opt-in
+        Made for macOS · Your messages are indexed and searched on your Mac · Anonymous usage
+        stats, never message content
       </footer>
     </div>
   );

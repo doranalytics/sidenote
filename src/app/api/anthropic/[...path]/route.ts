@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyInstall } from "@/app/api/register/route";
+import { meterJson, meterStream, report } from "@/lib/meter";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -80,6 +81,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ path: stri
     return NextResponse.json({ error: { message: "Bad request." } }, { status: 400 });
   }
 
+  const started = Date.now();
+  const model = (() => {
+    try {
+      return (JSON.parse(payload) as { model?: string }).model ?? "unknown";
+    } catch {
+      return "unknown";
+    }
+  })();
+  // Which feature made the call, so cost can be attributed to Explain vs a
+  // thread question vs a web look-up. Sent by the app; unknown if absent.
+  const fn = (req.headers.get("x-sidenote-fn") ?? "unknown").slice(0, 32);
+
   const upstream = await fetch(`${UPSTREAM}/${path}`, {
     method: "POST",
     headers: {
@@ -93,12 +106,34 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ path: stri
     body: payload,
   });
 
-  // Pass the body through untouched so streaming keeps working.
-  return new Response(upstream.body, {
+  const contentType = upstream.headers.get("content-type") ?? "application/json";
+  const finish = (usage: Awaited<ReturnType<typeof meterStream>>) =>
+    report({
+      installId: install.installId,
+      code: install.code,
+      fn,
+      model,
+      usage,
+      ms: Date.now() - started,
+      status: upstream.status,
+    });
+
+  // Non-streaming: read it, measure it, hand it on.
+  if (!contentType.includes("event-stream") || !upstream.body) {
+    const text = await upstream.text();
+    void finish(meterJson(text));
+    return new Response(text, {
+      status: upstream.status,
+      headers: { "content-type": contentType, "cache-control": "no-store" },
+    });
+  }
+
+  // Streaming: tee it. One copy goes to the app untouched so nothing about the
+  // response changes; the other is read only to total up tokens.
+  const [toClient, toMeter] = upstream.body.tee();
+  void meterStream(toMeter).then(finish);
+  return new Response(toClient, {
     status: upstream.status,
-    headers: {
-      "content-type": upstream.headers.get("content-type") ?? "application/json",
-      "cache-control": "no-store",
-    },
+    headers: { "content-type": contentType, "cache-control": "no-store" },
   });
 }

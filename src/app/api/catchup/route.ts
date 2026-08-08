@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getThread, getThreadTexts, isDemo } from "@/lib/store";
+import { track } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ function startJob(threadId: string, messages: { id: number; text: string }[]) {
     startedAt: Date.now(),
   };
   jobs.set(threadId, job);
+  track("embed_started", { messages: messages.length });
 
   // Deliberately not awaited — the response returns immediately and this keeps
   // going on its own.
@@ -49,6 +51,10 @@ function startJob(threadId: string, messages: { id: number; text: string }[]) {
         job.total = p.total;
       });
       job.done = job.total;
+      track("embed_completed", {
+        messages: job.total,
+        duration_ms: Date.now() - job.startedAt,
+      });
     } catch (e) {
       job.error = (e as Error).message;
     } finally {

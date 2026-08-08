@@ -83,6 +83,8 @@ type RunOptions = {
    *  it is always an explicit user action rather than something we infer. */
   webSearch?: boolean;
   maxTokens?: number;
+  /** Which feature this call is for, so the relay can attribute its cost. */
+  feature?: string;
   signal?: AbortSignal;
   onDone?: (answer: string) => void;
 };
@@ -122,7 +124,10 @@ export function streamClaude(opts: RunOptions): ReadableStream<Uint8Array> {
               messages,
               ...(tools.length ? { tools } : {}),
             },
-            { signal: opts.signal }
+            {
+              signal: opts.signal,
+              headers: { "x-sidenote-fn": opts.feature ?? "unknown" },
+            }
           );
 
           stream.on("text", (delta) => {

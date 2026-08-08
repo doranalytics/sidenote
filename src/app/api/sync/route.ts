@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { track } from "@/lib/analytics";
 import { invalidateStore, isDemo } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,15 @@ export async function POST() {
   }
   try {
     const { runSync, startLiveSync } = await import("@/lib/local-sync");
+    const started = Date.now();
     const result = runSync();
     invalidateStore();
     startLiveSync();
+    track("sync_completed", {
+      threads: result.threads,
+      messages: result.messages,
+      duration_ms: Date.now() - started,
+    });
     return NextResponse.json(result);
   } catch (e) {
     const err = e as Error;
