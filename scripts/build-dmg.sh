@@ -29,7 +29,12 @@ BUILD="$ROOT/build/mac"
 APP="$BUILD/Sidenote.app"
 DMG="$BUILD/Sidenote.dmg"
 ASSETS="$BUILD/dmg-assets"
-VENV="$ROOT/build/dmgtools"
+# Deliberately OUTSIDE the project. A venv contains symlinks that point out of
+# the filesystem root, and Turbopack walks everything under the project when it
+# traces modules — with this inside build/, `next build` dies with "Symlink ...
+# is invalid", and the app build fails while the DMG happily wraps whatever
+# stale bundle was left over.
+VENV="${XDG_CACHE_HOME:-$HOME/.cache}/sidenote/dmgtools"
 
 step() { printf '\n\033[1;34m▸ %s\033[0m\n' "$1"; }
 
@@ -41,6 +46,7 @@ codesign --verify --strict "$APP" || { echo "ABORT: $APP is not properly signed"
 
 step "Preparing dmgbuild…"
 if [[ ! -x "$VENV/bin/dmgbuild" ]]; then
+  mkdir -p "$(dirname "$VENV")"
   python3 -m venv "$VENV"
   "$VENV/bin/pip" install -q dmgbuild
 fi
