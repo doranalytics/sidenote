@@ -102,19 +102,10 @@ if [[ "$SKIP_NOTARIZE" == 0 ]]; then
   spctl -a -vv "$APP"
 fi
 
-cp "$ZIP" public/Sidenote.zip
-
-# What the download button is currently serving. The installed app compares
-# itself against THIS, not against repo HEAD — otherwise every docs or script
-# commit makes a freshly-downloaded app announce an update to itself.
-cat > public/build.json <<JSON
-{
-  "commit": "$COMMIT",
-  "date": "$COMMIT_DATE",
-  "version": "$VERSION",
-  "build": $BUILD_NUM
-}
-JSON
-
-step "Done → public/Sidenote.zip ($(du -h public/Sidenote.zip | cut -f1))"
-echo "   build.json → $COMMIT (${COMMIT_DATE})"
+# The binary deliberately does NOT go into public/. It used to, and because
+# public/Sidenote.zip is gitignored a CLI deploy carried it while a
+# git-triggered deploy served a 404 in its place. Publishing is now a separate
+# step against GitHub Releases; build.json is written there too, so the version
+# the site advertises can never drift from the file it actually serves.
+step "Done → $ZIP ($(du -h "$ZIP" | cut -f1))"
+echo "   next: scripts/build-dmg.sh && scripts/release.sh"

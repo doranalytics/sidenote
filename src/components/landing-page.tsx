@@ -7,7 +7,10 @@ import { Download, Lock } from "lucide-react";
 import { CHANGELOG } from "@/lib/changelog";
 import { Button } from "@/components/ui/button";
 
-const DOWNLOAD_URL = "/Sidenote.zip";
+// Redirects to the current GitHub release. The binary is deliberately not in
+// this deployment — it lived in public/ once, gitignored, so a git-triggered
+// deploy served a 404 where the download should be.
+const DOWNLOAD_URL = "/Sidenote.dmg";
 const APP_URL = "http://localhost:4747";
 
 // Probes the local install. A no-cors fetch resolves (opaque) if anything is
@@ -49,8 +52,8 @@ function AlreadyInstalled({ running }: { running: boolean | null }) {
       <p className="mt-1.5 text-[13px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
         Latest version is{" "}
         <span className="font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">{latest.date}</span> —{" "}
-        {latest.title.charAt(0).toLowerCase() + latest.title.slice(1)}. Download it and drag it
-        into Applications to replace the copy you have; your messages, notes, and pins stay put.
+        {latest.title.charAt(0).toLowerCase() + latest.title.slice(1)}. Sidenote updates itself —
+        open it and click the banner. Your messages, notes, and pins stay put.
       </p>
       <Button
         asChild
@@ -133,7 +136,8 @@ export function LandingPage() {
             </p>
             <ol className="mt-5 space-y-3">
               {[
-                <>Double-click the download, then open <span className="font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">Sidenote</span>. It offers to move itself to Applications — say yes.</>,
+                <>Open the download and drag <span className="font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">Sidenote</span> onto the Applications folder beside it.</>,
+                <>Open Sidenote from Applications. After this, it updates itself.</>,
                 <>Give it permission to read Messages. macOS asks you to flip one switch; Sidenote shows you exactly which, and takes it from there.</>,
               ].map((step, i) => (
                 <li

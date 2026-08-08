@@ -112,7 +112,11 @@ export async function GET(req: NextRequest) {
 // installed if Gatekeeper accepts it AND it carries this team — otherwise a
 // hijacked download would be enough to replace Sidenote with anything.
 const TEAM_ID = "CUH66KFZ33";
-const ZIP_URL = "https://sidenote.lol/Sidenote.zip";
+// Straight at the release rather than through sidenote.lol, so an update never
+// depends on the website being deployed correctly — which is exactly what took
+// the download out once already.
+const ZIP_URL =
+  "https://github.com/doranalytics/sidenote/releases/latest/download/Sidenote.zip";
 
 /** Downloads the published build, checks its signature, and swaps it in.
  *
