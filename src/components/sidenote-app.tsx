@@ -173,8 +173,17 @@ export function SidenoteApp() {
       .catch(() => null);
     if (!res?.ok) {
       setUpdating(false);
+      setSyncError(
+        res?.error === "notfound"
+          ? "Couldn't find Sidenote on disk to update."
+          : `Couldn't install the update${res?.error ? ` — ${res.error}` : ""}. Download it from sidenote.lol instead.`
+      );
       return;
     }
+    // The .app path replaces the bundle and relaunches, which means this
+    // process is about to be killed. There is nothing to poll for — the new
+    // copy comes up on its own.
+    if (res.relaunching) return;
     // Pull + rebuild + relaunch runs in the background; when the server
     // comes back on the new commit, reload into it.
     const target = update?.latest;
@@ -257,36 +266,25 @@ export function SidenoteApp() {
             update?.updateAvailable &&
             update.latest !== dismissed && (
               <div className="flex shrink-0 items-stretch bg-[#0a84ff] text-white">
-                {/* A .app install can't rewrite itself — that build ships as a
-                    new download — so the bar has to send you to the download
-                    page rather than pretending it can self-update. */}
-                {update.app ? (
-                  <a
-                    href="https://sidenote.lol"
-                    className="flex flex-1 items-center justify-center gap-1.5 px-4 py-1.5 text-center text-[12px] font-medium transition-colors hover:bg-[#0974df]"
-                  >
-                    <ArrowUpCircle className="size-3.5" />
-                    A newer version of Sidenote is available — download
-                  </a>
-                ) : (
-                  <button
-                    onClick={applyUpdate}
-                    disabled={updating}
-                    className="flex flex-1 items-center justify-center gap-1.5 px-4 py-1.5 text-center text-[12px] font-medium transition-colors hover:bg-[#0974df] disabled:opacity-80"
-                  >
-                    {updating ? (
-                      <>
-                        <RefreshCw className="size-3.5 animate-spin" />
-                        Updating — Sidenote will reload itself…
-                      </>
-                    ) : (
-                      <>
-                        <ArrowUpCircle className="size-3.5" />
-                        A newer version of Sidenote is available — install now
-                      </>
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={applyUpdate}
+                  disabled={updating}
+                  className="flex flex-1 items-center justify-center gap-1.5 px-4 py-1.5 text-center text-[12px] font-medium transition-colors hover:bg-[#0974df] disabled:opacity-80"
+                >
+                  {updating ? (
+                    <>
+                      <RefreshCw className="size-3.5 animate-spin" />
+                      {update.app
+                        ? "Downloading the new version — Sidenote will restart…"
+                        : "Updating — Sidenote will reload itself…"}
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpCircle className="size-3.5" />
+                      A newer version of Sidenote is available — install now
+                    </>
+                  )}
+                </button>
                 {!updating && (
                   <button
                     onClick={() => {

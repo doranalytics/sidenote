@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { isDemo } from "@/lib/store";
 import type { UpdateInfo } from "@/lib/types";
@@ -107,6 +108,109 @@ export async function GET(req: NextRequest) {
   );
 }
 
+// The Developer ID this app is signed with. A downloaded bundle is only
+// installed if Gatekeeper accepts it AND it carries this team — otherwise a
+// hijacked download would be enough to replace Sidenote with anything.
+const TEAM_ID = "CUH66KFZ33";
+const ZIP_URL = "https://sidenote.lol/Sidenote.zip";
+
+/** Downloads the published build, checks its signature, and swaps it in.
+ *
+ *  Sending people to the website was the old behaviour, and it produced the
+ *  worst possible outcome: they downloaded a new copy, double-clicked it, and
+ *  landed back in the still-running old one — because LaunchServices will not
+ *  start a second instance of a bundle id that is already running, so `open`
+ *  simply focused the app they were trying to replace. Nothing looked broken,
+ *  and nothing had changed. The swap therefore happens here, and the old
+ *  process is killed before the new one is launched. */
+async function installNewBuild() {
+  const appPath = process.env.SIDENOTE_APP_PATH;
+  if (!appPath || !fs.existsSync(appPath)) {
+    return NextResponse.json({ ok: false, app: true, error: "notfound" });
+  }
+  const stage = path.join(os.homedir(), ".sidenote", "update");
+  try {
+    fs.rmSync(stage, { recursive: true, force: true });
+    fs.mkdirSync(stage, { recursive: true });
+
+    const zip = path.join(stage, "Sidenote.zip");
+    const res = await fetch(ZIP_URL, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10 * 60_000),
+    });
+    if (!res.ok || !res.body) throw new Error(`download failed (${res.status})`);
+    fs.writeFileSync(zip, Buffer.from(await res.arrayBuffer()));
+
+    await run(`/usr/bin/ditto -x -k "${zip}" "${stage}"`);
+    const fresh = path.join(stage, "Sidenote.app");
+    if (!fs.existsSync(fresh)) throw new Error("no app inside the download");
+
+    // Gatekeeper first, then the team — accepted-but-someone-else's is still
+    // a stranger's code.
+    await run(`/usr/sbin/spctl -a -t exec "${fresh}"`);
+    const { stdout } = await run(`/usr/bin/codesign -dv --verbose=2 "${fresh}" 2>&1`);
+    if (!stdout.includes(`TeamIdentifier=${TEAM_ID}`)) {
+      throw new Error("the download is signed by someone else");
+    }
+
+    const lsregister =
+      "/System/Library/Frameworks/CoreServices.framework" +
+      "/Frameworks/LaunchServices.framework/Support/lsregister";
+    const exe = path.join(appPath, "Contents/MacOS/Sidenote");
+    const stamp = Date.now();
+
+    // Detached and in its own session: it outlives the app it is about to
+    // quit, which includes this server.
+    const log = fs.openSync(path.join(os.homedir(), ".sidenote", "update.log"), "a");
+    spawn(
+      "/bin/bash",
+      [
+        "-c",
+        `
+        sleep 1
+        # Every running copy has to go before the new one can start.
+        pkill -f "${exe}" 2>/dev/null
+        for i in $(seq 1 60); do
+          pgrep -f "${exe}" >/dev/null 2>&1 || break
+          sleep 0.2
+        done
+        pkill -9 -f "${exe}" 2>/dev/null
+        sleep 0.5
+        # Keep the old bundle in the Trash rather than deleting it, so a bad
+        # build is recoverable by hand.
+        /bin/mv -f "${appPath}" "$HOME/.Trash/Sidenote-${stamp}.app" 2>/dev/null
+        if ! /usr/bin/ditto "${fresh}" "${appPath}"; then
+          /bin/mv -f "$HOME/.Trash/Sidenote-${stamp}.app" "${appPath}" 2>/dev/null
+          /usr/bin/open -R "${fresh}"
+          exit 1
+        fi
+        "${lsregister}" -f "${appPath}" 2>/dev/null
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          /usr/bin/open "${appPath}" 2>/dev/null
+          sleep 1
+          if pgrep -f "${exe}" >/dev/null 2>&1; then
+            /bin/rm -rf "${stage}"
+            exit 0
+          fi
+        done
+        /usr/bin/open -R "${appPath}"
+        `,
+      ],
+      { detached: true, stdio: ["ignore", log, log] }
+    ).unref();
+
+    cached = null;
+    return NextResponse.json({ ok: true, app: true, relaunching: true });
+  } catch (e) {
+    fs.rmSync(stage, { recursive: true, force: true });
+    return NextResponse.json({
+      ok: false,
+      app: true,
+      error: (e as Error).message,
+    });
+  }
+}
+
 // Applies the update: pull, install, rebuild, then kick the LaunchAgent so
 // launchd relaunches on the new build. Runs detached (its own session) so it
 // survives the server it's about to restart.
@@ -114,10 +218,7 @@ export async function POST() {
   if (isDemo) {
     return NextResponse.json({ error: "Only available when running locally." }, { status: 400 });
   }
-  if (process.env.SIDENOTE_APP === "1") {
-    // The app updates by downloading a fresh build, not by git pull.
-    return NextResponse.json({ ok: false, managed: false, app: true });
-  }
+  if (process.env.SIDENOTE_APP === "1") return installNewBuild();
   if (process.env.SIDENOTE_MANAGED !== "1") {
     return NextResponse.json({ ok: false, managed: false });
   }

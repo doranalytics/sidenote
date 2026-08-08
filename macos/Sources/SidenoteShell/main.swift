@@ -222,6 +222,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 if [ -n "\(leftover)" ] && [ -d "\(leftover)" ]; then
                   /bin/mv -f "\(leftover)" "$HOME/.Trash/Sidenote-\(stamp).app" 2>/dev/null
                 fi
+                # An older copy already running from the destination is the
+                # reason this used to appear to do nothing: `open` will not
+                # start a second instance of a bundle id that is live, so it
+                # just brought the OLD app forward — and the pgrep below then
+                # matched that same old process and called it success. Whoever
+                # is holding the destination has to be told to go first.
+                /usr/bin/pkill -f "\(exe)" 2>/dev/null
+                for i in $(/usr/bin/seq 1 60); do
+                  /usr/bin/pgrep -f "\(exe)" >/dev/null 2>&1 || break
+                  /bin/sleep 0.2
+                done
+                /usr/bin/pkill -9 -f "\(exe)" 2>/dev/null
+                /bin/sleep 0.5
                 "\(lsregister)" -f "\(moved.path)" 2>/dev/null
                 for i in 1 2 3 4 5 6 7 8 9 10; do
                   /usr/bin/open "\(moved.path)" 2>/dev/null
