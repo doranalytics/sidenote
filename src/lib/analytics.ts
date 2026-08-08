@@ -36,6 +36,9 @@ export type AppEvent =
 
 export function track(event: AppEvent, properties: Record<string, unknown> = {}): void {
   const key = process.env.POSTHOG_KEY;
+  if (process.env.SIDENOTE_DEBUG_ANALYTICS === "1") {
+    console.error(`[analytics] ${event} key=${key ? "set" : "MISSING"}`);
+  }
   if (!key) return;
   // Fire and forget — analytics must never slow down or break a user action.
   void fetch(`${HOST}/capture/`, {
@@ -53,7 +56,15 @@ export function track(event: AppEvent, properties: Record<string, unknown> = {})
         $process_person_profile: true,
       },
     }),
-  }).catch(() => {
-    // offline, or PostHog down — never surface this
-  });
+  })
+    .then((r) => {
+      if (process.env.SIDENOTE_DEBUG_ANALYTICS === "1") {
+        console.error(`[analytics] ${event} -> ${r.status}`);
+      }
+    })
+    .catch((e) => {
+      if (process.env.SIDENOTE_DEBUG_ANALYTICS === "1") {
+        console.error(`[analytics] ${event} FAILED: ${(e as Error).message}`);
+      }
+    });
 }
