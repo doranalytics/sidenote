@@ -63,6 +63,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             people came from. Deliberately NOT loaded inside Sidenote.app: the
             app reports its own events server-side, from one auditable place,
             and never captures page text or clicks. */}
+        {/* DXYZ Dashboard beacon — unique-visitor counting for the public
+            site only, on the same isDemo gate as the analytics snippet: the
+            packaged app must never report itself as web traffic. */}
+        {isDemo && (
+          <script defer src="https://dxyz-dashboard.vercel.app/d/sidenote.js" />
+        )}
         {isDemo && POSTHOG_KEY && (
           <script
             dangerouslySetInnerHTML={{
