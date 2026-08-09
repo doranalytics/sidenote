@@ -22,13 +22,15 @@ const nextConfig: NextConfig = {
   // a 404 in its place. It lives on GitHub Releases now, which no deploy can
   // affect, and these keep the old URLs working. `latest` always resolves to
   // the newest release, so this never needs updating per build.
-  async redirects() {
-    const asset = (name: string) =>
-      `https://github.com/doranalytics/sidenote/releases/latest/download/${name}`;
+  // Rewritten rather than redirected so /api/download can count the download
+  // before forwarding. A plain redirect is resolved before any code runs, which
+  // made every direct link and every click from somewhere that isn't our own
+  // button invisible.
+  async rewrites() {
     return [
-      { source: "/Sidenote.dmg", destination: asset("Sidenote.dmg"), permanent: false },
-      { source: "/Sidenote.zip", destination: asset("Sidenote.zip"), permanent: false },
-      { source: "/download", destination: asset("Sidenote.dmg"), permanent: false },
+      { source: "/Sidenote.dmg", destination: "/api/download?f=dmg" },
+      { source: "/Sidenote.zip", destination: "/api/download?f=zip" },
+      { source: "/download", destination: "/api/download?f=dmg" },
     ];
   },
   // The Mac app bundles the server as a standalone build; normal dev/deploy
