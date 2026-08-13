@@ -71,6 +71,7 @@ const FEATURE_PILLS = [
   "Reply drafts",
   "Pinned moments",
   "Notes on people",
+  "Ask about any thread",
   "Look it up",
   "Clean exports",
   "Auto updates",
@@ -258,8 +259,8 @@ export function LandingPage() {
         {/* Hero screenshot as a rounded slab */}
         <div className="ld-appear mt-16 md:mt-24" style={{ animationDelay: "0.75s" }}>
           <img
-            src="/screenshot.png"
-            alt="Sidenote showing a conversation"
+            src="/hero-remember.png"
+            alt="Sidenote with a message right-clicked — Explain this, Look this up, Help me reply, and Remember this"
             className="w-full rounded-[24px] shadow-[0_30px_80px_rgba(10,60,120,0.18)] md:rounded-[32px]"
           />
         </div>
@@ -285,8 +286,51 @@ export function LandingPage() {
           </div>
         </Reveal>
 
+        {/* Featured: ask AI about a whole thread. The chat is an HTML mock (the
+            Cooldock trick — their widget renders are DOM, not screenshots),
+            using the demo thread's own sample data so it reads as real. */}
+        <Reveal className="mt-16 md:mt-20">
+          <div className="rounded-[28px] bg-white p-6 text-left shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
+            <div className="grid items-center gap-8 md:grid-cols-2">
+              <div>
+                <p className="text-[12px] font-semibold tracking-[0.12em] text-[#0a84ff] uppercase">
+                  New — AI that knows your history
+                </p>
+                <h3 className="mt-2 text-[28px] leading-[1.05] font-bold tracking-[-0.03em] md:text-[36px]">
+                  Ask about any conversation
+                </h3>
+                <p className="mt-3 text-[14.5px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
+                  Open the Ask AI panel on a thread and ask anything — about last week or ten years
+                  ago. Sidenote searches the whole history and answers from the actual messages.
+                  And right-clicking any single message explains it, looks it up, or drafts your
+                  reply.
+                </p>
+              </div>
+              <div className="rounded-[20px] bg-[#f2f5f9] p-4 dark:bg-[#0b0d10]">
+                <p className="border-b border-black/[0.05] pb-2.5 text-[12.5px] font-semibold dark:border-white/10">
+                  Ask about Maya Chen
+                </p>
+                <div className="mt-3 space-y-2.5 text-[13px] leading-snug">
+                  <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[#0a84ff] px-3.5 py-2 text-white">
+                    wait, why do we keep calling that dog Baguette?
+                  </p>
+                  <p className="w-fit max-w-[90%] rounded-2xl rounded-bl-md bg-white px-3.5 py-2 text-[#333] shadow-sm dark:bg-[#1c1e22] dark:text-[#d5d5d7]">
+                    On Aug 11 you found the &ldquo;bread dog&rdquo; on the East Rock dogs Instagram
+                    and told Maya &ldquo;his name is Baguette. I am not making this up.&rdquo; She
+                    declared it the best day of her life — it&apos;s been a running joke since.
+                  </p>
+                </div>
+                <p className="mt-3 flex items-center justify-between rounded-full bg-white px-4 py-2.5 text-[12.5px] text-[#9a9aa0] shadow-sm dark:bg-[#1c1e22]">
+                  Ask about Maya Chen…
+                  <span className="font-medium text-[#0a84ff]">↑</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
         {/* Feature cards */}
-        <div id="features" className="mt-16 grid gap-5 pb-16 text-left md:mt-20 md:grid-cols-2">
+        <div id="features" className="mt-5 grid gap-5 pb-16 text-left md:grid-cols-2">
           {[
             {
               img: "/shot-explain.png",
