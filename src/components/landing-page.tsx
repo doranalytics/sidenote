@@ -260,14 +260,19 @@ export function LandingPage() {
             mirroring how the panel actually opens in-app (right side, dimmed
             thread behind). The panel is an HTML mock fed by the demo data. */}
         <figure className="ld-appear mt-16 md:mt-24" style={{ animationDelay: "0.75s" }}>
-          <div className="relative overflow-hidden rounded-[24px] shadow-[0_30px_80px_rgba(10,60,120,0.18)] md:rounded-[32px]">
-            <img
-              src="/screenshot.png"
-              alt="A Sidenote conversation with the Ask AI panel open"
-              className="w-full"
-            />
-            <div className="absolute inset-0 hidden bg-[#1d2530]/25 backdrop-blur-[3px] sm:block" />
-            <div className="absolute top-[4%] right-[2.5%] bottom-[4%] hidden w-[38%] flex-col rounded-2xl bg-white text-left shadow-2xl sm:flex dark:bg-[#15171a]">
+          {/* On phones the inset panel would be unreadably small — so the
+              screenshot dims and the SAME panel overlaps it as a card,
+              because the AI chat IS the hero. sm+ keeps the in-app inset. */}
+          <div className="relative">
+            <div className="relative overflow-hidden rounded-[24px] shadow-[0_30px_80px_rgba(10,60,120,0.18)] md:rounded-[32px]">
+              <img
+                src="/screenshot.png"
+                alt="A Sidenote conversation with the Ask AI panel open"
+                className="w-full"
+              />
+              <div className="absolute inset-0 bg-[#1d2530]/25 backdrop-blur-[3px]" />
+            </div>
+            <div className="relative mx-3 -mt-16 flex flex-col rounded-2xl bg-white text-left shadow-2xl sm:absolute sm:top-[4%] sm:right-[2.5%] sm:bottom-[4%] sm:mx-0 sm:mt-0 sm:w-[38%] dark:bg-[#15171a]">
               <div className="flex items-center justify-between px-5 pt-4">
                 <p className="text-[15px] font-semibold">Maya Chen</p>
                 <span className="text-[15px] text-[#9a9aa0]">✕</span>
@@ -288,7 +293,7 @@ export function LandingPage() {
                   declared it the best day of her life — it&apos;s been a running joke since.
                 </p>
               </div>
-              <p className="mx-5 mb-4 flex items-center justify-between rounded-full bg-[#f2f5f9] px-4 py-2 text-[12px] text-[#9a9aa0] dark:bg-[#0b0d10]">
+              <p className="mx-5 mt-3 mb-4 flex items-center justify-between rounded-full bg-[#f2f5f9] px-4 py-2 text-[12px] text-[#9a9aa0] dark:bg-[#0b0d10]">
                 Ask about Maya Chen…
                 <span className="font-medium text-[#0a84ff]">↑</span>
               </p>
