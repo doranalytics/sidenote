@@ -256,14 +256,50 @@ export function LandingPage() {
           </div>
         )}
 
-        {/* Hero screenshot as a rounded slab */}
-        <div className="ld-appear mt-16 md:mt-24" style={{ animationDelay: "0.75s" }}>
-          <img
-            src="/hero-remember.png"
-            alt="Sidenote with a message right-clicked — Explain this, Look this up, Help me reply, and Remember this"
-            className="w-full rounded-[24px] shadow-[0_30px_80px_rgba(10,60,120,0.18)] md:rounded-[32px]"
-          />
-        </div>
+        {/* Hero: the Ask AI panel composited over the real app screenshot,
+            mirroring how the panel actually opens in-app (right side, dimmed
+            thread behind). The panel is an HTML mock fed by the demo data. */}
+        <figure className="ld-appear mt-16 md:mt-24" style={{ animationDelay: "0.75s" }}>
+          <div className="relative overflow-hidden rounded-[24px] shadow-[0_30px_80px_rgba(10,60,120,0.18)] md:rounded-[32px]">
+            <img
+              src="/screenshot.png"
+              alt="A Sidenote conversation with the Ask AI panel open"
+              className="w-full"
+            />
+            <div className="absolute inset-0 hidden bg-[#1d2530]/25 backdrop-blur-[3px] sm:block" />
+            <div className="absolute top-[4%] right-[2.5%] bottom-[4%] hidden w-[38%] flex-col rounded-2xl bg-white text-left shadow-2xl sm:flex dark:bg-[#15171a]">
+              <div className="flex items-center justify-between px-5 pt-4">
+                <p className="text-[15px] font-semibold">Maya Chen</p>
+                <span className="text-[15px] text-[#9a9aa0]">✕</span>
+              </div>
+              <div className="mx-5 mt-3 grid grid-cols-2 rounded-full bg-[#f2f5f9] p-1 text-center text-[12.5px] font-medium dark:bg-[#0b0d10]">
+                <span className="rounded-full py-1.5 text-[#6e6e73] dark:text-[#a1a1a6]">Notes</span>
+                <span className="rounded-full bg-white py-1.5 shadow-sm dark:bg-[#1c1e22]">
+                  Ask AI
+                </span>
+              </div>
+              <div className="flex-1 space-y-2.5 overflow-hidden px-5 pt-4 text-[12.5px] leading-snug">
+                <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[#0a84ff] px-3 py-1.5 text-white">
+                  wait, why do we keep calling that dog Baguette?
+                </p>
+                <p className="w-fit max-w-[92%] rounded-2xl rounded-bl-md bg-[#f2f5f9] px-3 py-1.5 text-[#333] dark:bg-[#0b0d10] dark:text-[#d5d5d7]">
+                  On Aug 11 you found the &ldquo;bread dog&rdquo; on the East Rock dogs Instagram
+                  and told Maya &ldquo;his name is Baguette. I am not making this up.&rdquo; She
+                  declared it the best day of her life — it&apos;s been a running joke since.
+                </p>
+              </div>
+              <p className="mx-5 mb-4 flex items-center justify-between rounded-full bg-[#f2f5f9] px-4 py-2 text-[12px] text-[#9a9aa0] dark:bg-[#0b0d10]">
+                Ask about Maya Chen…
+                <span className="font-medium text-[#0a84ff]">↑</span>
+              </p>
+            </div>
+          </div>
+          <figcaption className="mx-auto mt-5 max-w-[60ch] text-[13.5px] leading-relaxed text-[#8a8a8a] dark:text-[#7c7c80]">
+            <span className="font-semibold text-[#0a84ff]">Ask AI, built in.</span>{" "}
+            Open the panel on any conversation and ask about anything — last week or ten years ago.
+            Sidenote searches the whole history and answers from the actual messages.
+          </figcaption>
+        </figure>
 
         {/* Feature pill cloud */}
         <Reveal className="mt-20 md:mt-28">
@@ -312,12 +348,11 @@ export function LandingPage() {
                 </p>
                 <div className="mt-3 space-y-2.5 text-[13px] leading-snug">
                   <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[#0a84ff] px-3.5 py-2 text-white">
-                    wait, why do we keep calling that dog Baguette?
+                    when did Maya ship her pattern?
                   </p>
                   <p className="w-fit max-w-[90%] rounded-2xl rounded-bl-md bg-white px-3.5 py-2 text-[#333] shadow-sm dark:bg-[#1c1e22] dark:text-[#d5d5d7]">
-                    On Aug 11 you found the &ldquo;bread dog&rdquo; on the East Rock dogs Instagram
-                    and told Maya &ldquo;his name is Baguette. I am not making this up.&rdquo; She
-                    declared it the best day of her life — it&apos;s been a running joke since.
+                    Sun, Aug 2 — &ldquo;WE SHIPPED IT.&rdquo; The indigo wave pattern made the
+                    cover of the lookbook, and you two celebrated that Saturday over coffee.
                   </p>
                 </div>
                 <p className="mt-3 flex items-center justify-between rounded-full bg-white px-4 py-2.5 text-[12.5px] text-[#9a9aa0] shadow-sm dark:bg-[#1c1e22]">
