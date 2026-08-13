@@ -2,10 +2,9 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Lock } from "lucide-react";
 import { CHANGELOG } from "@/lib/changelog";
-import { Button } from "@/components/ui/button";
 
 // Redirects to the current GitHub release. The binary is deliberately not in
 // this deployment — it lived in public/ once, gitignored, so a git-triggered
@@ -32,6 +31,51 @@ function useLocalApp() {
   return running;
 }
 
+// Fades a section in the first time it scrolls into view. The hero uses timed
+// CSS delays instead; this is for everything below the fold.
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className={`${className} transition-[opacity,transform] duration-1000 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
+        shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+const FEATURE_PILLS = [
+  "Local first",
+  "Privacy first",
+  "Full-text search",
+  "Explain any message",
+  "Reply drafts",
+  "Pinned moments",
+  "Notes on people",
+  "Look it up",
+  "Clean exports",
+  "Auto updates",
+];
+
 // Sidenote is a Mac app, so this never offers to "open" anything in a browser
 // tab — that just showed the local server's web UI and made the product feel
 // like a website. If the app is running here, the only useful thing the site
@@ -41,7 +85,7 @@ function AlreadyInstalled({ running }: { running: boolean | null }) {
   if (!running) return null;
 
   return (
-    <div className="mx-auto mt-8 max-w-md rounded-2xl border border-[#30d158]/30 bg-[#30d158]/[0.07] p-4 text-center">
+    <div className="mx-auto mt-8 max-w-md rounded-3xl border border-[#30d158]/30 bg-[#30d158]/[0.07] p-5 text-center">
       <p className="flex items-center justify-center gap-2 text-[13.5px] font-medium">
         <span className="relative flex size-2">
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#30d158] opacity-60" />
@@ -51,7 +95,7 @@ function AlreadyInstalled({ running }: { running: boolean | null }) {
       </p>
       <p className="mt-1.5 text-[13px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
         Latest version is{" "}
-        <span className="font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">{latest.date}</span> —{" "}
+        <span className="font-medium text-[#111] dark:text-[#f5f5f7]">{latest.date}</span> —{" "}
         {latest.title.charAt(0).toLowerCase() + latest.title.slice(1)}. Open Sidenote and click the
         banner at the top; it installs the update itself. Your messages, notes, and pins stay put.
       </p>
@@ -61,7 +105,7 @@ function AlreadyInstalled({ running }: { running: boolean | null }) {
       <a
         href={DOWNLOAD_URL}
         download
-        className="mt-2.5 inline-block text-[12px] text-[#6e6e73] underline underline-offset-2 hover:text-[#1d1d1f] dark:text-[#a1a1a6] dark:hover:text-[#f5f5f7]"
+        className="mt-2.5 inline-block text-[12px] text-[#6e6e73] underline underline-offset-2 hover:text-[#111] dark:text-[#a1a1a6] dark:hover:text-[#f5f5f7]"
       >
         Or download it again
       </a>
@@ -74,61 +118,113 @@ export function LandingPage() {
   const running = useLocalApp();
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-[#fbfbfd] text-[#1d1d1f] dark:bg-black dark:text-[#f5f5f7]">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-        <span className="text-[17px] font-semibold tracking-tight">Sidenote</span>
-        <div className="flex items-center gap-5">
-          <a href="/demo" className="text-[13px] font-medium text-[#0a84ff] hover:underline">
+    <div className="min-h-dvh overflow-y-auto bg-[#f2f5f9] font-[InterDisplay,Inter,system-ui,sans-serif] text-[#111] dark:bg-[#0b0d10] dark:text-[#f5f5f7]">
+      {/* Inter Display for the Cooldock-style display type; hoisted by React. */}
+      <link rel="stylesheet" href="https://rsms.me/inter/inter.css" precedence="default" />
+      <style
+        // Hero entrance: Cooldock's appear effect is a bounce-free 1s spring
+        // from y:-53 — this easing curve is the CSS approximation of it.
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes ld-drop { from { opacity: 0; transform: translateY(-28px); } to { opacity: 1; transform: none; } }
+            .ld-appear { animation: ld-drop 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+            @media (prefers-reduced-motion: reduce) { .ld-appear { animation: none; } }
+          `,
+        }}
+      />
+
+      {/* Floating frosted pill nav */}
+      <header className="fixed inset-x-4 top-4 z-50 mx-auto flex h-14 max-w-4xl items-center justify-between rounded-full border border-[#0a84ff]/10 bg-white/80 px-3 shadow-[0_8px_30px_rgba(10,60,120,0.08)] backdrop-blur-[10px] dark:border-white/10 dark:bg-[#15171a]/80">
+        <span className="flex items-center gap-2.5 pl-1.5">
+          <img src="/icon-192.png" alt="" className="size-8 rounded-[9px] shadow-sm" />
+          <span className="text-[16px] font-semibold tracking-tight">Sidenote</span>
+        </span>
+        <nav className="hidden items-center gap-6 text-[14px] font-medium text-[#555] sm:flex dark:text-[#a1a1a6]">
+          <a href="/demo" className="transition-colors hover:text-[#111] dark:hover:text-white">
             Live demo
           </a>
-        </div>
+          <a href="#features" className="transition-colors hover:text-[#111] dark:hover:text-white">
+            Features
+          </a>
+          <a href="#changelog" className="transition-colors hover:text-[#111] dark:hover:text-white">
+            Updates
+          </a>
+        </nav>
+        <a
+          href={DOWNLOAD_URL}
+          download
+          onClick={() => setShowSetup(true)}
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[#0a84ff] px-4 text-[13px] font-medium text-white transition-[transform,background-color] hover:scale-[1.03] hover:bg-[#0974df]"
+        >
+          <Download className="size-3.5" />
+          Download
+        </a>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 pt-10 text-center md:pt-20">
-        <img
-          src="/icon-192.png"
-          alt=""
-          className="mx-auto size-16 rounded-[22.5%] shadow-lg md:size-20"
-        />
-        <h1 className="mt-8 text-[44px] leading-[1.05] font-semibold tracking-tight md:text-[64px]">
-          Every text.
-          <br />
-          Remembered.
+      <main className="mx-auto max-w-5xl px-6 pt-36 text-center md:pt-44">
+        {/* Eyebrow */}
+        <p
+          className="ld-appear flex items-center justify-center gap-2 text-[15px] font-medium tracking-tight"
+          style={{ animationDelay: "0.05s" }}
+        >
+          <img src="/icon-192.png" alt="" className="size-5 rounded-[6px]" />
+          Your iMessage companion
+        </p>
+
+        <h1
+          className="ld-appear mx-auto mt-5 max-w-4xl text-[52px] leading-[0.98] font-bold tracking-[-0.04em] md:text-[92px]"
+          style={{ animationDelay: "0.15s" }}
+        >
+          Every text. Remembered.
         </h1>
-        <p className="mx-auto mt-5 max-w-[34ch] text-[17px] leading-relaxed text-[#6e6e73] md:text-[19px] dark:text-[#a1a1a6]">
+        <p
+          className="ld-appear mx-auto mt-7 max-w-[52ch] text-[17px] leading-relaxed text-[#6b6b6b] md:text-[20px] dark:text-[#a1a1a6]"
+          style={{ animationDelay: "0.3s" }}
+        >
           Search your entire iMessage history, pin the moments that matter, and right-click any
           message to ask what it means.
         </p>
 
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button
-            asChild
-            className="h-12 rounded-full bg-[#0a84ff] px-7 text-[15px] font-medium hover:bg-[#0974df]"
+        <div
+          className="ld-appear mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          style={{ animationDelay: "0.45s" }}
+        >
+          <a
+            href={DOWNLOAD_URL}
+            download
+            onClick={() => setShowSetup(true)}
+            className="flex h-11 items-center gap-2 rounded-full bg-[#0a84ff] px-6 text-[14px] font-medium text-white shadow-[0_8px_24px_rgba(10,132,255,0.35)] transition-[transform,background-color] hover:scale-[1.03] hover:bg-[#0974df]"
           >
-            <a href={DOWNLOAD_URL} download onClick={() => setShowSetup(true)}>
-              <Download className="mr-1.5 size-4" />
-              Download Sidenote for Mac
-            </a>
-          </Button>
-          <Button
-            asChild
-            variant="ghost"
-            className="h-12 rounded-full px-6 text-[15px] font-medium text-[#0a84ff] hover:bg-[#0a84ff]/5"
+            <Download className="size-4" />
+            Download for macOS
+          </a>
+          <a
+            href="/demo"
+            className="flex h-11 items-center rounded-full px-5 text-[14px] font-medium text-[#0a84ff] transition-colors hover:bg-[#0a84ff]/5 dark:hover:bg-[#0a84ff]/15"
           >
-            <a href="/demo">Browse the demo →</a>
-          </Button>
+            Browse the demo →
+          </a>
         </div>
 
-        <p className="mt-6 flex items-center justify-center gap-1.5 text-[13px] text-[#6e6e73] dark:text-[#a1a1a6]">
-          <Lock className="size-3.5" />
-          Your archive stays on your Mac. AI only sees the message you ask about.
+        {/* Cooldock-style small caption row */}
+        <p
+          className="ld-appear mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12.5px] text-[#8a8a8a] dark:text-[#7c7c80]"
+          style={{ animationDelay: "0.6s" }}
+        >
+          <span>Free download</span>
+          <span>Apple silicon</span>
+          <span>Auto updates</span>
+          <span className="flex items-center gap-1.5">
+            <Lock className="size-3" />
+            Your archive stays on your Mac — AI only sees the message you ask about
+          </span>
         </p>
 
         <AlreadyInstalled running={running} />
 
         {showSetup && (
-          <div className="mx-auto mt-10 max-w-2xl rounded-3xl border border-black/[0.08] bg-white p-7 text-left shadow-lg md:p-9 dark:border-white/10 dark:bg-[#141416]">
-            <p className="text-[19px] font-semibold tracking-tight md:text-[21px]">
+          <div className="mx-auto mt-10 max-w-2xl rounded-[28px] bg-white p-7 text-left shadow-[0_20px_60px_rgba(0,0,0,0.08)] md:p-9 dark:bg-[#161616]">
+            <p className="text-[20px] font-bold tracking-tight md:text-[22px]">
               Opening it for the first time
             </p>
             <p className="mt-1 text-[13.5px] text-[#6e6e73] dark:text-[#a1a1a6]">
@@ -136,7 +232,7 @@ export function LandingPage() {
             </p>
             <ol className="mt-5 space-y-3">
               {[
-                <>Open the download and drag <span className="font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">Sidenote</span> onto the Applications folder beside it.</>,
+                <>Open the download and drag <span className="font-medium text-[#111] dark:text-[#f5f5f7]">Sidenote</span> onto the Applications folder beside it.</>,
                 <>Open Sidenote from Applications. After this, it updates itself.</>,
                 <>Give it permission to read Messages. macOS asks you to flip one switch; Sidenote shows you exactly which, and takes it from there.</>,
               ].map((step, i) => (
@@ -151,7 +247,7 @@ export function LandingPage() {
                 </li>
               ))}
             </ol>
-            <p className="mt-5 border-t border-black/[0.06] pt-5 text-[13.5px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
+            <p className="mt-5 border-t border-black/[0.06] pt-5 text-[13.5px] leading-relaxed text-[#6e6e73] dark:border-white/10 dark:text-[#a1a1a6]">
               Then it syncs, and everything works — search, notes, and AI included. Your messages
               are indexed on your Mac; asking about one sends just that message and the few around
               it, and only when you ask.
@@ -159,15 +255,38 @@ export function LandingPage() {
           </div>
         )}
 
-        <div className="mt-14 md:mt-20">
+        {/* Hero screenshot as a rounded slab */}
+        <div className="ld-appear mt-16 md:mt-24" style={{ animationDelay: "0.75s" }}>
           <img
             src="/screenshot.png"
             alt="Sidenote showing a conversation"
-            className="w-full rounded-xl border border-black/[0.08] shadow-2xl md:rounded-2xl dark:border-white/10"
+            className="w-full rounded-[24px] shadow-[0_30px_80px_rgba(10,60,120,0.18)] md:rounded-[32px]"
           />
         </div>
 
-        <div className="mt-16 grid gap-x-8 gap-y-12 pb-16 text-left md:mt-24 md:grid-cols-2">
+        {/* Feature pill cloud */}
+        <Reveal className="mt-20 md:mt-28">
+          <h2 className="mx-auto max-w-3xl text-[36px] leading-[1.02] font-bold tracking-[-0.03em] md:text-[56px]">
+            Everything you texted, one click away
+          </h2>
+          <p className="mx-auto mt-5 max-w-[54ch] text-[16px] leading-relaxed text-[#6b6b6b] md:text-[18px] dark:text-[#a1a1a6]">
+            Search, pins, notes, AI explanations, reply drafts, and clean exports — all working
+            from the archive already sitting on your Mac.
+          </p>
+          <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-2.5">
+            {FEATURE_PILLS.map((pill) => (
+              <span
+                key={pill}
+                className="rounded-full bg-white px-4 py-2 text-[13px] font-medium text-[#333] shadow-[0_1px_3px_rgba(10,60,120,0.08)] dark:bg-[#1c1e22] dark:text-[#d5d5d7]"
+              >
+                {pill}
+              </span>
+            ))}
+          </div>
+        </Reveal>
+
+        {/* Feature cards */}
+        <div id="features" className="mt-16 grid gap-5 pb-16 text-left md:mt-20 md:grid-cols-2">
           {[
             {
               img: "/shot-explain.png",
@@ -200,61 +319,65 @@ export function LandingPage() {
               sub: "Copy a clean transcript of any time range, ready to paste into ChatGPT or Claude.",
             },
           ].map((f) => (
-            <figure key={f.title}>
-              <figcaption className="mb-3">
-                <p className="text-[19px] font-semibold tracking-tight">{f.title}</p>
-                <p className="mt-1 text-[13.5px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
-                  {f.sub}
-                </p>
-              </figcaption>
-              <img
-                src={f.img}
-                alt={f.title}
-                className="aspect-[8/5] w-full rounded-xl border border-black/[0.08] object-cover shadow-xl dark:border-white/10"
-              />
-            </figure>
+            <Reveal key={f.title}>
+              <figure className="h-full rounded-[28px] bg-white p-6 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-7 dark:bg-[#15171a]">
+                <figcaption className="mb-5">
+                  <p className="text-[21px] font-bold tracking-[-0.02em]">{f.title}</p>
+                  <p className="mt-1.5 text-[13.5px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
+                    {f.sub}
+                  </p>
+                </figcaption>
+                <img
+                  src={f.img}
+                  alt={f.title}
+                  className="aspect-[8/5] w-full rounded-[18px] object-cover shadow-[0_12px_35px_rgba(0,0,0,0.12)]"
+                />
+              </figure>
+            </Reveal>
           ))}
         </div>
 
         {/* What's new */}
-        <div className="mx-auto mb-20 max-w-2xl border-t border-black/[0.06] pt-14 dark:border-white/10">
-          <p className="text-[13px] font-semibold tracking-wide text-[#0a84ff] uppercase">
-            What&apos;s new
-          </p>
-          <h2 className="mt-2 text-[28px] leading-tight font-semibold tracking-tight md:text-[34px]">
-            Sidenote keeps getting better
-          </h2>
-          <div className="mt-9 space-y-9 text-left">
-            {CHANGELOG.map((entry) => (
-              <div key={entry.title} className="flex flex-col gap-1.5 sm:flex-row sm:gap-6">
-                <span className="w-24 shrink-0 pt-0.5 text-[12.5px] text-[#6e6e73] sm:text-right dark:text-[#a1a1a6]">
-                  {entry.date}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[16px] font-semibold tracking-tight">{entry.title}</p>
-                  <ul className="mt-1.5 space-y-1">
-                    {entry.points.map((point) => (
-                      <li
-                        key={point}
-                        className="flex gap-2 text-[13.5px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]"
-                      >
-                        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-[#0a84ff]" />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
+        <Reveal className="mx-auto mb-20 max-w-2xl">
+          <div id="changelog" className="rounded-[28px] bg-white p-8 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
+            <p className="text-[12px] font-semibold tracking-[0.12em] text-[#0a84ff] uppercase">
+              What&apos;s new
+            </p>
+            <h2 className="mt-2 text-[30px] leading-[1.05] font-bold tracking-[-0.03em] md:text-[38px]">
+              Sidenote keeps getting better
+            </h2>
+            <div className="mt-9 space-y-9 text-left">
+              {CHANGELOG.map((entry) => (
+                <div key={entry.title} className="flex flex-col gap-1.5 sm:flex-row sm:gap-6">
+                  <span className="w-24 shrink-0 pt-0.5 text-[12.5px] text-[#8a8a8a] sm:text-right dark:text-[#7c7c80]">
+                    {entry.date}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[16px] font-semibold tracking-tight">{entry.title}</p>
+                    <ul className="mt-1.5 space-y-1">
+                      {entry.points.map((point) => (
+                        <li
+                          key={point}
+                          className="flex gap-2 text-[13.5px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]"
+                        >
+                          <span className="mt-[7px] size-1 shrink-0 rounded-full bg-[#0a84ff]" />
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <p className="mt-10 text-center text-[13px] text-[#8a8a8a] dark:text-[#7c7c80]">
+              Already installed? Sidenote offers new versions right in the app — one click, no
+              Terminal.
+            </p>
           </div>
-          <p className="mt-10 text-center text-[13px] text-[#6e6e73] dark:text-[#a1a1a6]">
-            Already installed? Sidenote offers new versions right in the app — one click, no
-            Terminal.
-          </p>
-        </div>
+        </Reveal>
       </main>
 
-      <footer className="pb-10 text-center text-[12px] text-[#6e6e73] dark:text-[#a1a1a6]">
+      <footer className="pb-10 text-center text-[12px] text-[#8a8a8a] dark:text-[#7c7c80]">
         Made for macOS · Your messages are indexed and searched on your Mac · Anonymous usage
         stats, never message content
       </footer>
