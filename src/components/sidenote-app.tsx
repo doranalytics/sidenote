@@ -28,6 +28,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { ActivationScreen } from "@/components/activation-screen";
 
 export function SidenoteApp() {
   const [status, setStatus] = useState<AppStatus | null>(null);
@@ -241,7 +242,16 @@ export function SidenoteApp() {
 
   const activeThread = threads.find((t) => t.id === active?.threadId) ?? null;
   const demo = status?.mode === "demo";
+  // The license wall comes before everything else: a copied DMG stops here.
+  // Signing in once stores the token in the vault; after that this is never
+  // shown again, online or off. Legacy invite-code installs already hold a
+  // token, so they sail through.
+  const needsActivation = !loading && status?.mode === "local" && !status.ai?.signedIn;
   const needsSetup = !loading && status?.mode === "local" && !status.synced;
+
+  if (needsActivation) {
+    return <ActivationScreen onActivated={refresh} />;
+  }
 
   if (needsSetup) {
     return (

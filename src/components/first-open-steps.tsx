@@ -19,13 +19,16 @@ export function FirstOpenSteps() {
           </>,
           <>Open Sidenote from Applications. After this, it updates itself.</>,
           <>
+            Unlock it: sign in with the email you bought with. A 6-digit code arrives by email —
+            no password. One time; the app stays unlocked after that.
+          </>,
+          <>
             Give it permission to read Messages. macOS asks you to flip one switch; Sidenote shows
             you exactly which, and takes it from there.
           </>,
           <>
-            For AI, open <span className="font-medium text-[#111] dark:text-[#f5f5f7]">Settings → AI</span>,
-            sign in with the email you bought with (a 6-digit code arrives by email), and turn it on
-            — ${AI_MONTHLY_USD}/month, cancel any time.
+            Want AI? Turn it on in <span className="font-medium text-[#111] dark:text-[#f5f5f7]">Settings → AI</span> —
+            ${AI_MONTHLY_USD}/month, cancel any time. Everything else works without it.
           </>,
         ].map((step, i) => (
           <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
