@@ -4,9 +4,10 @@ The iMessage companion for your Mac. Search everything you've ever texted, pin
 the messages worth remembering, keep notes on the people you care about, and
 ask on-device AI about any thread.
 
-**Get it:** https://sidenote.lol — the site is a live demo with
-sample conversations plus a one-command installer. Sidenote itself runs 100%
-locally; a web server can't (and shouldn't) read your Messages database.
+**Get it:** https://sidenote.lol — $39 once for the app; AI is an optional
+$10/month you turn on from inside it. The site has a live demo with sample
+conversations. Sidenote itself runs 100% locally; a web server can't (and
+shouldn't) read your Messages database.
 
 ## What it does
 
@@ -39,27 +40,51 @@ locally; a web server can't (and shouldn't) read your Messages database.
 
 ## Install
 
-Paste this into Terminal:
+Buy it at https://sidenote.lol → download the DMG → drag Sidenote to
+Applications → open it. It updates itself after that. Bought it already and
+lost the file? https://sidenote.lol/download — sign in with the purchase
+email (a 6-digit code arrives by email) and download again.
 
-```bash
-curl -fsSL https://sidenote.lol/install.sh | bash
-```
+Two things matter after it opens:
 
-It installs to `~/Sidenote`, starts the app at http://localhost:4747, and opens
-it in your browser. Then click **Sync your Messages**.
+1. **Full Disk Access**, so Sidenote can read the Messages database. The
+   app's setup screen has a button that opens the exact System Settings pane
+   — macOS requires you to flip the toggle yourself. The grant goes to
+   Sidenote on your Mac, never to any cloud service.
+2. **AI (optional, $10/month)**: Settings → AI → sign in with the email you
+   bought with → Turn on AI. Checkout opens in your browser; come back and AI
+   is on. Manage or cancel from the same place. Without it, everything else —
+   sync, search, notes, pins, export — works normally.
 
-Two permissions matter:
+Power users can still paste their own Anthropic key into Settings (or set
+`ANTHROPIC_API_KEY`); that bypasses the subscription and bills Anthropic
+directly. Running from a git checkout (`npm run dev`) works too, but AI still
+needs an account.
 
-1. **Full Disk Access** for your terminal app, so Sidenote can read the
-   Messages database. The app's setup screen has a button that opens the exact
-   System Settings pane — macOS requires you to flip the toggle yourself. The
-   grant goes to your terminal app on your Mac, never to any cloud service.
-2. **An Anthropic API key** (optional, for AI): paste one into Settings › AI.
-   Explaining a message costs a fraction of a cent; searching the web costs
-   about a cent and only happens when you tap it. Without a key, everything
-   else — sync, search, notes, pins, export — works normally.
+### How the paywall is wired (for whoever maintains this)
 
-`ANTHROPIC_API_KEY` in the environment overrides the key stored in Settings.
+- **Stripe** (doranalytics account): products "Sidenote for Mac" ($39 once)
+  and "Sidenote AI" ($10/month). `/api/checkout` starts either; the webhook at
+  `/api/stripe/webhook` mirrors purchases and subscription state into
+  Supabase. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `STRIPE_PRICE_APP`, `STRIPE_PRICE_AI` (test keys on Preview, live on
+  Production).
+- **Supabase** (project `sidenote`, ref `dvmpjltqemrrrbrbmnhf`): table
+  `purchases` (kind `app` | `ai`), table `downloads`, private bucket
+  `releases` holding `Sidenote.dmg` / `Sidenote.zip`. Auth is email OTP; the
+  code template is `supabase/templates/signin-code.html`. Env: `SUPABASE_URL`,
+  `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. Migrations in
+  `supabase/migrations`; `supabase db push` / `supabase config push`.
+- **Tokens** (`src/lib/access.ts`): install tokens `v2.<install>.<user>.<sig>`
+  (what the app keeps; sent to the AI relay and the updater endpoint) and
+  24-hour download tokens. Legacy invite tokens (`v1.…`) still verify.
+- **Releases**: `scripts/release.sh` uploads to the private bucket. Pass
+  `--github` only for the one transition build that pre-paywall installs
+  update from.
+- **Letting someone in by hand**: `node scripts/grant.mjs <email>`.
+- Supabase's built-in mailer is rate-limited (a handful of emails per hour).
+  Before real volume, put custom SMTP (Resend etc.) in `supabase/config.toml`
+  under `[auth.email.smtp]` and push.
 
 ## Privacy
 
@@ -69,11 +94,12 @@ searched, and embedded entirely on your Mac: the message index lives in
 notes, pinned messages, and AI chats in `~/.sidenote/vault.db`.
 
 The one exception is AI, and it is opt-in and narrow. When you ask about a
-message, Sidenote sends that message and roughly forty around it to Anthropic
-to answer — nothing more, and only at the moment you ask. Tapping **Search the
-web** additionally sends the search terms Claude writes. Your API key is stored
-in the vault and never leaves your machine. With no key configured, no message
-ever goes anywhere.
+message, Sidenote sends that message and roughly forty around it — via a relay
+on sidenote.lol that holds the Anthropic key, or straight to Anthropic if you
+supplied your own — to get an answer. Nothing more, and only at the moment you
+ask. Tapping **Search the web** additionally sends the search terms Claude
+writes. The relay meters tokens per install for cost; it never stores message
+content. With AI off, no message ever goes anywhere.
 
 **Analytics.** Sidenote reports anonymous usage from the app: that it opened,
 that a sync finished and how many messages it covered, that a conversation was
