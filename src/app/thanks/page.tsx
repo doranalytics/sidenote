@@ -102,7 +102,7 @@ export default async function Thanks({
         <p className="mx-auto mt-5 max-w-[46ch] text-[16px] leading-relaxed text-[#6b6b6b] md:text-[18px] dark:text-[#a1a1a6]">
           Go back to Sidenote — it picks this up on its own within a moment (or click{" "}
           <span className="font-medium text-[#111] dark:text-[#f5f5f7]">Check again</span> in
-          Settings → AI). Receipts go to{" "}
+          Settings → AI). It&apos;s on{" "}
           <span className="font-medium text-[#111] dark:text-[#f5f5f7]">{email}</span>; cancel any
           time from the same place.
         </p>
@@ -122,9 +122,9 @@ export default async function Thanks({
             You&apos;re in.
           </h1>
           <p className="mx-auto mt-5 max-w-[46ch] text-[16px] leading-relaxed text-[#6b6b6b] md:text-[18px] dark:text-[#a1a1a6]">
-            Sidenote is yours. A receipt is on its way to{" "}
+            Sidenote is yours, under{" "}
             <span className="font-medium text-[#111] dark:text-[#f5f5f7]">{email}</span> — that&apos;s
-            also the email you&apos;ll sign in with inside the app.
+            the email you&apos;ll sign in with inside the app, and where Stripe sends your receipts.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3">
             <a
