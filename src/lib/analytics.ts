@@ -27,6 +27,7 @@ export type AppEvent =
   | "app_opened"
   | "sync_completed"
   | "code_redeemed"
+  | "signed_in"
   | "embed_started"
   | "embed_completed"
   | "search_performed"

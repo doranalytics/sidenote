@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyInstall } from "@/app/api/register/route";
+import { installHasAi, installLabel, verifyInstall } from "@/lib/access";
 import { meterJson, meterStream, report } from "@/lib/meter";
 
 export const dynamic = "force-dynamic";
@@ -11,15 +11,16 @@ export const maxDuration = 300;
 // including its tool loop — works unchanged. Tools still execute on the user's
 // Mac: only the model call crosses the wire.
 //
-// Access is per install: a copy of Sidenote redeems an invite code once (see
-// /api/register) and sends the resulting signed token here. Removing a code
-// from SIDENOTE_INVITE_CODES revokes every install that used it, which is the
-// answer to "my friend forwarded the app to someone".
+// Access is per install: a copy of Sidenote signs in once with the email it
+// was bought under (see /api/auth/*) and sends the resulting signed token
+// here. The token proves who; the purchases table (checked, cached) proves
+// their AI subscription is live — a lapse switches AI off within ten minutes.
+// Pre-paywall invite-code tokens still verify, so nobody's install breaks.
 //
-// ⚠️  Still not a hard boundary: whoever holds a valid code — or extracts a
-// token from their own install — can call this directly and spend the
-// operator's Anthropic balance. Per-IP limits and a billing cap on the
-// Anthropic key are what actually bound the damage until usage metering exists.
+// ⚠️  Still not a hard boundary: whoever extracts a token from their own
+// install can call this directly and spend the operator's Anthropic balance.
+// The per-install rate limit and a billing cap on the Anthropic key are what
+// bound the damage.
 
 const UPSTREAM = "https://api.anthropic.com";
 const ALLOWED = new Set(["v1/messages"]);
@@ -52,8 +53,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ path: stri
   const install = verifyInstall(req.headers.get("x-sidenote-install"));
   if (!install) {
     return NextResponse.json(
-      { error: { message: "This copy of Sidenote isn't registered." } },
+      { error: { message: "This copy of Sidenote isn't signed in." } },
       { status: 401 }
+    );
+  }
+  if (!(await installHasAi(install))) {
+    return NextResponse.json(
+      { error: { message: "AI isn't on for this Sidenote account. Subscribe in Settings → AI." } },
+      { status: 403 }
     );
   }
 
@@ -110,7 +117,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ path: stri
   const finish = (usage: Awaited<ReturnType<typeof meterStream>>) =>
     report({
       installId: install.installId,
-      code: install.code,
+      code: installLabel(install),
       fn,
       model,
       usage,

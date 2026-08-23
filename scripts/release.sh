@@ -1,14 +1,18 @@
 #!/bin/bash
-# Publishes the built app to GitHub Releases and points the site at it.
-# Usage: scripts/release.sh
+# Publishes the built app to the private release store and points the site at it.
+# Usage: scripts/release.sh [--github]
 #
-# The download used to be a 72 MB file inside the Vercel deployment, which had
-# a failure mode nobody would guess: public/Sidenote.zip is gitignored, so a
-# CLI deploy carried it and a git-triggered deploy did not. Any push could
-# therefore replace a working download page with a 404, and did. Releases are
-# the fix — the binary lives somewhere a deploy cannot touch, and
-# /releases/latest/download/<name> is a stable URL that always resolves to the
-# newest one.
+# Builds live in the `releases` bucket of the Sidenote Supabase project, which
+# is private: sidenote.lol hands out 60-second links to people who have paid
+# (/api/download for the DMG, /api/release/Sidenote.zip for the in-app
+# updater). They used to be public GitHub Releases — which is no paywall at
+# all — and before that a 72 MB file inside the Vercel deployment, which a
+# git-triggered deploy would silently drop.
+#
+# --github additionally publishes to GitHub Releases. That exists for one
+# reason: copies of Sidenote built before the paywall update themselves from
+# there, so the first paywall build has to go up publicly or they can never
+# reach the code that knows about the private store. After that, don't.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -18,6 +22,8 @@ BUILD="$ROOT/build/mac"
 APP="$BUILD/Sidenote.app"
 DMG="$BUILD/Sidenote.dmg"
 ZIP="$BUILD/Sidenote.zip"
+GITHUB=0
+[[ "${1:-}" == "--github" ]] && GITHUB=1
 
 step() { printf '\n\033[1;34m▸ %s\033[0m\n' "$1"; }
 
@@ -36,18 +42,23 @@ VERSION="$(date +%Y.%-m.%-d)"
 BUILD_NUM="$(git rev-list --count HEAD)"
 TAG="v$VERSION-$BUILD_NUM"
 
-step "Publishing ${TAG} to ${REPO}…"
-if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-  gh release upload "$TAG" "$DMG" "$ZIP" --repo "$REPO" --clobber
-else
-  gh release create "$TAG" "$DMG" "$ZIP" \
-    --repo "$REPO" \
-    --title "Sidenote $VERSION" \
-    --notes "Build $BUILD_NUM — $COMMIT_DATE
+step "Uploading ${TAG} to the private release store…"
+# `supabase link` once (project ref dvmpjltqemrrrbrbmnhf) and this just works.
+supabase storage cp "$DMG" ss:///releases/Sidenote.dmg --experimental
+supabase storage cp "$ZIP" ss:///releases/Sidenote.zip --experimental
 
-Download **Sidenote.dmg**, open it, and drag Sidenote to Applications.
+if [[ $GITHUB == 1 ]]; then
+  step "Also publishing ${TAG} to GitHub Releases (public — transition build only)…"
+  if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+    gh release upload "$TAG" "$DMG" "$ZIP" --repo "$REPO" --clobber
+  else
+    gh release create "$TAG" "$DMG" "$ZIP" \
+      --repo "$REPO" \
+      --title "Sidenote $VERSION" \
+      --notes "Build $BUILD_NUM — $COMMIT_DATE
 
-The .zip is what the in-app updater downloads; you do not need it."
+Sidenote is \$39 at https://sidenote.lol. This release exists so earlier installs can update themselves; AI and future updates need a purchase."
+  fi
 fi
 
 # The installed app compares itself against this, so it has to describe the
@@ -61,7 +72,8 @@ cat > public/build.json <<JSON
 }
 JSON
 
-step "Released → https://github.com/$REPO/releases/tag/$TAG"
-echo "   dmg → https://github.com/$REPO/releases/latest/download/Sidenote.dmg"
-echo "   zip → https://github.com/$REPO/releases/latest/download/Sidenote.zip"
+step "Released ${TAG}"
+echo "   dmg → releases/Sidenote.dmg (private; served by sidenote.lol/api/download)"
+echo "   zip → releases/Sidenote.zip (private; served by sidenote.lol/api/release/Sidenote.zip)"
+[[ $GITHUB == 1 ]] && echo "   github → https://github.com/$REPO/releases/tag/$TAG"
 echo "   build.json → $COMMIT ($COMMIT_DATE) — commit and deploy the site next"

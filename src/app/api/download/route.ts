@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logDownload, releaseUrl, verifyDownload } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
-// Counts a download, then sends the browser to the release asset.
+// Hands out the DMG to someone who has paid, then counts it.
 //
-// This exists because the download is a redirect to GitHub Releases. A plain
-// redirect is handled before any page code runs, so a click from Product Hunt,
-// a pasted link, or anything that isn't our own button would never be seen —
-// downloads would look like whatever fraction happened to come through the
-// landing page.
+// The build lives in a private bucket (it was a public GitHub Release, which
+// is no paywall at all). A download token — minted by /thanks right after
+// paying, or by /download after signing in with the purchase email — turns
+// into a 60-second signed URL here. No token, or a stale one, and you're sent
+// to the sign-in page rather than shown an error: "download it again" is the
+// normal reason to arrive here without one.
 //
-// The capture is fire-and-forget and never delays the redirect: a slow
-// analytics call must not be the reason someone's download hangs.
+// The PostHog capture is fire-and-forget and never delays the redirect.
 
 const ASSETS: Record<string, string> = {
   dmg: "Sidenote.dmg",
   zip: "Sidenote.zip",
 };
 
-const RELEASE = "https://github.com/doranalytics/sidenote/releases/latest/download";
 const HOST = process.env.POSTHOG_HOST ?? "https://us.i.posthog.com";
 
 /** The id posthog-js already gave this browser, so a download joins up with
@@ -39,8 +39,24 @@ function distinctId(req: NextRequest): string {
 
 export async function GET(req: NextRequest) {
   const file = ASSETS[req.nextUrl.searchParams.get("f") ?? "dmg"] ?? ASSETS.dmg;
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  const grant = verifyDownload(req.nextUrl.searchParams.get("t"));
+  if (!grant) {
+    const to = new URL("/download", req.nextUrl.origin);
+    to.searchParams.set("expired", req.nextUrl.searchParams.has("t") ? "1" : "0");
+    return NextResponse.redirect(to, 303);
+  }
 
+  const url = await releaseUrl(file);
+  if (!url) {
+    return NextResponse.json(
+      { error: "The download isn't available right now. Try again in a few minutes." },
+      { status: 503 }
+    );
+  }
+
+  void logDownload(grant.email, file, grant.via);
+
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   if (key) {
     const referrer = req.headers.get("referer") ?? "";
     let source = "direct";
@@ -52,25 +68,22 @@ export async function GET(req: NextRequest) {
     void fetch(`${HOST}/capture/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(4000),
       body: JSON.stringify({
         api_key: key,
-        event: "download_started",
+        event: "download",
         distinct_id: distinctId(req),
         properties: {
           file,
           format: file.endsWith(".dmg") ? "dmg" : "zip",
           source,
+          via: grant.via,
           $referrer: referrer,
-          // UTM tags survive the redirect, so a Product Hunt link stays
-          // attributable all the way to the download.
-          utm_source: req.nextUrl.searchParams.get("utm_source") ?? undefined,
-          utm_campaign: req.nextUrl.searchParams.get("utm_campaign") ?? undefined,
           $current_url: req.nextUrl.href,
         },
       }),
     }).catch(() => {});
   }
 
-  return NextResponse.redirect(`${RELEASE}/${file}`, 307);
+  return NextResponse.redirect(url, 307);
 }

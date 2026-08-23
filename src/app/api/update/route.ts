@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import { isDemo } from "@/lib/store";
 import type { UpdateInfo } from "@/lib/types";
+import { getInstallToken } from "@/lib/claude";
 
 export const dynamic = "force-dynamic";
 
@@ -112,11 +113,11 @@ export async function GET(req: NextRequest) {
 // installed if Gatekeeper accepts it AND it carries this team — otherwise a
 // hijacked download would be enough to replace Sidenote with anything.
 const TEAM_ID = "CUH66KFZ33";
-// Straight at the release rather than through sidenote.lol, so an update never
-// depends on the website being deployed correctly — which is exactly what took
-// the download out once already.
-const ZIP_URL =
-  "https://github.com/doranalytics/sidenote/releases/latest/download/Sidenote.zip";
+// Builds live in a private store behind a purchase; sidenote.lol hands out a
+// short-lived link to an install that presents its token. Without one (never
+// signed in) the update can't be fetched, and the banner says to sign in.
+const HOME = process.env.SIDENOTE_HOME ?? "https://sidenote.lol";
+const ZIP_URL = `${HOME}/api/release/Sidenote.zip`;
 
 /** Downloads the published build, checks its signature, and swaps it in.
  *
@@ -138,10 +139,17 @@ async function installNewBuild() {
     fs.mkdirSync(stage, { recursive: true });
 
     const zip = path.join(stage, "Sidenote.zip");
-    const res = await fetch(ZIP_URL, {
+    const token = getInstallToken();
+    if (!token) throw new Error("sign in to Sidenote (Settings → AI) to get updates");
+    // The token rides in the query: the redirect that follows goes to a
+    // signed storage URL, and fetch does not forward custom headers across
+    // a cross-origin redirect anyway.
+    const res = await fetch(`${ZIP_URL}?t=${encodeURIComponent(token)}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(10 * 60_000),
     });
+    if (res.status === 401) throw new Error("sign in to Sidenote (Settings → AI) to get updates");
+    if (res.status === 403) throw new Error("this account no longer has an active purchase");
     if (!res.ok || !res.body) throw new Error(`download failed (${res.status})`);
     fs.writeFileSync(zip, Buffer.from(await res.arrayBuffer()));
 

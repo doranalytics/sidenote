@@ -48,7 +48,13 @@ export type AppStatus = {
   threadCount: number;
   messageCount: number;
   ai: {
-    configured: boolean; // an Anthropic API key is saved
+    configured: boolean; // AI will work: own key, or signed in with a live subscription
+    signedIn?: boolean; // has an account token (may still need to subscribe)
+    email?: string | null;
+    subscribed?: boolean;
+    aiStatus?: string | null; // Stripe subscription status, or "invite"
+    aiPeriodEnd?: string | null;
+    ownKey?: boolean;
   };
   engine?: string; // what macOS lists under Full Disk Access: the app bundle, or the node binary
   translocated?: boolean; // running from a temporary copy, where an FDA grant can't persist

@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSetting, setSetting } from "@/lib/vault";
+// Circular on purpose (entitlement reads the token from here); both sides
+// only call across at runtime, never during module load.
+import { aiEntitled } from "@/lib/entitlement";
 
 // Claude Haiku 4.5 does this job for a fifth of a cent a question. It was
 // chosen over the bigger models deliberately: decoding slang and reading tone
@@ -17,14 +20,25 @@ const KEY_SETTING = "anthropic_api_key";
 const RELAY = process.env.SIDENOTE_RELAY ?? "https://sidenote.lol/api/anthropic";
 
 const INSTALL_SETTING = "install_token";
+const ACCOUNT_SETTING = "account_email";
 
-/** The token this copy of Sidenote got when it redeemed an invite code. */
+/** The token this copy of Sidenote got when it signed in (or, before
+ *  accounts existed, when it redeemed an invite code). */
 export function getInstallToken(): string | null {
   return getSetting(INSTALL_SETTING);
 }
 
 export function setInstallToken(token: string | null): void {
   setSetting(INSTALL_SETTING, token);
+}
+
+/** The email this copy is signed in as — shown in Settings, nothing more. */
+export function getAccountEmail(): string | null {
+  return getSetting(ACCOUNT_SETTING);
+}
+
+export function setAccountEmail(email: string | null): void {
+  setSetting(ACCOUNT_SETTING, email);
 }
 
 // The key lives in the vault so it survives app updates and re-syncs. Reading
@@ -43,14 +57,18 @@ export function hasOwnKey(): boolean {
   return !!getApiKey();
 }
 
-/** AI needs either a redeemed invite code or the user's own Anthropic key. */
+/** AI needs either a signed-in account with a live subscription, or the
+ *  user's own Anthropic key. (The relay is the real gate; this is what the
+ *  app draws.) */
 export function aiAvailable(): boolean {
-  return !!getInstallToken() || hasOwnKey();
+  if (hasOwnKey()) return true;
+  if (!getInstallToken()) return false;
+  return aiEntitled();
 }
 
 export class NotRegisteredError extends Error {
   constructor() {
-    super("Enter your Sidenote invite code to turn on AI.");
+    super("Sign in to Sidenote (Settings → AI) to turn on AI.");
     this.name = "NotRegisteredError";
   }
 }
@@ -209,7 +227,10 @@ export function friendlyError(e: Error): string {
   if (status === 401) {
     return getApiKey()
       ? "That API key was rejected. Check it in Settings."
-      : "This copy of Sidenote is no longer registered. Enter a new invite code in Settings.";
+      : "This copy of Sidenote is signed out. Sign in again in Settings → AI.";
+  }
+  if (status === 403 && !getApiKey()) {
+    return "This Sidenote account no longer has an active purchase.";
   }
   if (status === 503) return "Sidenote's AI service is unavailable right now.";
   if (status === 429) return "Too many requests — give it a moment.";

@@ -3,13 +3,16 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState } from "react";
-import { Download, Lock } from "lucide-react";
+import { Check, Lock, ShoppingBag } from "lucide-react";
 import { CHANGELOG } from "@/lib/changelog";
+import { AI_MONTHLY_USD, PRICE_USD } from "@/lib/pricing";
 
-// Redirects to the current GitHub release. The binary is deliberately not in
-// this deployment — it lived in public/ once, gitignored, so a git-triggered
-// deploy served a 404 where the download should be.
-const DOWNLOAD_URL = "/Sidenote.dmg";
+// Buying starts here: a plain link into Stripe Checkout, and Stripe sends you
+// back to /thanks with the download. Someone who already paid downloads again
+// from /download by signing in with the purchase email. The binary itself is
+// in a private store — never in this deployment, never on a public URL.
+const BUY_URL = "/api/checkout";
+const AGAIN_URL = "/download";
 const APP_URL = "http://localhost:4747";
 
 // Probes the local install. A no-cors fetch resolves (opaque) if anything is
@@ -100,12 +103,10 @@ function AlreadyInstalled({ running }: { running: boolean | null }) {
         {latest.title.charAt(0).toLowerCase() + latest.title.slice(1)}. Open Sidenote and click the
         banner at the top; it installs the update itself. Your messages, notes, and pins stay put.
       </p>
-      {/* No download button here on purpose. Offering one to someone who
-          already has the app is how you end up with a second copy in
-          Downloads and a first-launch flow they did not need. */}
+      {/* No buy button here on purpose. Offering one to someone who already
+          has the app is how you end up with a second purchase. */}
       <a
-        href={DOWNLOAD_URL}
-        download
+        href={AGAIN_URL}
         className="mt-2.5 inline-block text-[12px] text-[#6e6e73] underline underline-offset-2 hover:text-[#111] dark:text-[#a1a1a6] dark:hover:text-[#f5f5f7]"
       >
         Or download it again
@@ -115,7 +116,6 @@ function AlreadyInstalled({ running }: { running: boolean | null }) {
 }
 
 export function LandingPage() {
-  const [showSetup, setShowSetup] = useState(false);
   const running = useLocalApp();
 
   return (
@@ -147,18 +147,19 @@ export function LandingPage() {
           <a href="#features" className="transition-colors hover:text-[#111] dark:hover:text-white">
             Features
           </a>
+          <a href="#pricing" className="transition-colors hover:text-[#111] dark:hover:text-white">
+            Pricing
+          </a>
           <a href="#changelog" className="transition-colors hover:text-[#111] dark:hover:text-white">
             Updates
           </a>
         </nav>
         <a
-          href={DOWNLOAD_URL}
-          download
-          onClick={() => setShowSetup(true)}
+          href={BUY_URL}
           className="flex h-9 items-center gap-1.5 rounded-full bg-[#0a84ff] px-4 text-[13px] font-medium text-white transition-[transform,background-color] hover:scale-[1.03] hover:bg-[#0974df]"
         >
-          <Download className="size-3.5" />
-          Download
+          <ShoppingBag className="size-3.5" />
+          Buy · ${PRICE_USD}
         </a>
       </header>
 
@@ -191,13 +192,12 @@ export function LandingPage() {
           style={{ animationDelay: "0.45s" }}
         >
           <a
-            href={DOWNLOAD_URL}
-            download
-            onClick={() => setShowSetup(true)}
+            id="buy"
+            href={BUY_URL}
             className="flex h-11 items-center gap-2 rounded-full bg-[#0a84ff] px-6 text-[14px] font-medium text-white shadow-[0_8px_24px_rgba(10,132,255,0.35)] transition-[transform,background-color] hover:scale-[1.03] hover:bg-[#0974df]"
           >
-            <Download className="size-4" />
-            Download for macOS
+            <ShoppingBag className="size-4" />
+            Get Sidenote for macOS — ${PRICE_USD}
           </a>
           <a
             href="/demo"
@@ -212,7 +212,8 @@ export function LandingPage() {
           className="ld-appear mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12.5px] text-[#8a8a8a] dark:text-[#7c7c80]"
           style={{ animationDelay: "0.6s" }}
         >
-          <span>Free download</span>
+          <span>${PRICE_USD} once — yours for good</span>
+          <span>AI optional, ${AI_MONTHLY_USD}/month</span>
           <span>Apple silicon</span>
           <span>Auto updates</span>
           <span className="flex items-center gap-1.5">
@@ -223,43 +224,38 @@ export function LandingPage() {
 
         <AlreadyInstalled running={running} />
 
-        {showSetup && (
-          <div className="mx-auto mt-10 max-w-2xl rounded-[28px] bg-white p-7 text-left shadow-[0_20px_60px_rgba(0,0,0,0.08)] md:p-9 dark:bg-[#161616]">
-            <p className="text-[20px] font-bold tracking-tight md:text-[22px]">
-              Opening it for the first time
-            </p>
-            <p className="mt-1 text-[13.5px] text-[#6e6e73] dark:text-[#a1a1a6]">
-              Requires a Mac with Apple silicon — any Mac from 2021 on.
-            </p>
-            <ol className="mt-5 space-y-3">
-              {[
-                <>Open the download and drag <span className="font-medium text-[#111] dark:text-[#f5f5f7]">Sidenote</span> onto the Applications folder beside it.</>,
-                <>Open Sidenote from Applications. After this, it updates itself.</>,
-                <>Give it permission to read Messages. macOS asks you to flip one switch; Sidenote shows you exactly which, and takes it from there.</>,
-              ].map((step, i) => (
-                <li
-                  key={i}
-                  className="flex gap-3 text-[14px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]"
-                >
-                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[#0a84ff]/10 text-[12px] font-bold text-[#0a84ff]">
-                    {i + 1}
-                  </span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-5 border-t border-black/[0.06] pt-5 text-[13.5px] leading-relaxed text-[#6e6e73] dark:border-white/10 dark:text-[#a1a1a6]">
-              Then it syncs, and everything works — search, notes, and AI included. Your messages
-              are indexed on your Mac; asking about one sends just that message and the few around
-              it, and only when you ask.
-            </p>
-          </div>
-        )}
+        <p
+          className="ld-appear mt-3 text-[12.5px] text-[#8a8a8a] dark:text-[#7c7c80]"
+          style={{ animationDelay: "0.6s" }}
+        >
+          Already bought it?{" "}
+          <a href={AGAIN_URL} className="underline underline-offset-2 hover:text-[#111] dark:hover:text-[#f5f5f7]">
+            Download it again
+          </a>
+        </p>
 
         {/* Hero: the Ask AI panel composited over the real app screenshot,
             mirroring how the panel actually opens in-app (right side, dimmed
-            thread behind). The panel is an HTML mock fed by the demo data. */}
-        <figure className="ld-appear mt-16 md:mt-24" style={{ animationDelay: "0.75s" }}>
+            thread behind). The panel is an HTML mock fed by the demo data.
+            The words come first: a screenshot with a chat in it doesn't
+            explain itself. */}
+        <div className="ld-appear mx-auto mt-20 max-w-2xl md:mt-28" style={{ animationDelay: "0.7s" }}>
+          <p className="text-[12px] font-semibold tracking-[0.12em] text-[#0a84ff] uppercase">
+            What you&apos;re looking at
+          </p>
+          <h2 className="mt-2 text-[30px] leading-[1.05] font-bold tracking-[-0.03em] md:text-[40px]">
+            Your texts on the left. Ask AI about them on the right.
+          </h2>
+          <p className="mx-auto mt-4 max-w-[58ch] text-[15.5px] leading-relaxed text-[#6b6b6b] md:text-[17px] dark:text-[#a1a1a6]">
+            This is Sidenote with a conversation open and the{" "}
+            <span className="font-medium text-[#111] dark:text-[#f5f5f7]">Ask AI</span> panel
+            pulled out beside it. Type a question — &ldquo;why do we call that dog
+            Baguette?&rdquo; — and it searches the whole history of that thread, years back, and
+            answers from the actual messages, citing the day. Search, pins, notes, and export are
+            yours for ${PRICE_USD}; AI is an optional ${AI_MONTHLY_USD}/month on top.
+          </p>
+        </div>
+        <figure className="ld-appear mt-8 md:mt-10" style={{ animationDelay: "0.8s" }}>
           <div className="relative overflow-hidden rounded-[24px] shadow-[0_30px_80px_rgba(10,60,120,0.18)] md:rounded-[32px]">
             <img
               src="/screenshot.png"
@@ -294,11 +290,6 @@ export function LandingPage() {
               </p>
             </div>
           </div>
-          <figcaption className="mx-auto mt-5 max-w-[60ch] text-[13.5px] leading-relaxed text-[#8a8a8a] dark:text-[#7c7c80]">
-            <span className="font-semibold text-[#0a84ff]">Ask AI, built in.</span>{" "}
-            Open the panel on any conversation and ask about anything — last week or ten years ago.
-            Sidenote searches the whole history and answers from the actual messages.
-          </figcaption>
         </figure>
 
         {/* Feature pill cloud */}
@@ -416,6 +407,82 @@ export function LandingPage() {
           ))}
         </div>
 
+        {/* Pricing: two numbers. The app is bought once; AI is a monthly
+            you can turn on and off from inside the app. */}
+        <Reveal className="mx-auto mb-16 max-w-3xl">
+          <div id="pricing" className="rounded-[28px] bg-white p-8 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
+            <p className="text-[12px] font-semibold tracking-[0.12em] text-[#0a84ff] uppercase">
+              Pricing
+            </p>
+            <h2 className="mt-2 text-[30px] leading-[1.05] font-bold tracking-[-0.03em] md:text-[38px]">
+              Buy it once. Add AI if you want it.
+            </h2>
+            <div className="mt-8 grid gap-4 text-left md:grid-cols-2">
+              <div className="rounded-[22px] border border-black/[0.06] p-6 dark:border-white/10">
+                <p className="text-[13px] font-semibold tracking-tight text-[#6e6e73] dark:text-[#a1a1a6]">
+                  Sidenote for Mac
+                </p>
+                <p className="mt-1 text-[40px] leading-none font-bold tracking-[-0.04em]">
+                  ${PRICE_USD}
+                  <span className="ml-1.5 text-[15px] font-medium tracking-normal text-[#8a8a8a]">once</span>
+                </p>
+                <ul className="mt-5 space-y-2 text-[14px] text-[#333] dark:text-[#d5d5d7]">
+                  {[
+                    "Search every text you've ever sent",
+                    "Pin the moments that matter",
+                    "Notes on every person",
+                    "Clean exports of any conversation",
+                    "Every update, no upgrade fee",
+                    "Everything stays on your Mac",
+                  ].map((line) => (
+                    <li key={line} className="flex items-start gap-2">
+                      <Check className="mt-[3px] size-3.5 shrink-0 text-[#0a84ff]" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={BUY_URL}
+                  className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#0a84ff] px-6 text-[14px] font-medium text-white shadow-[0_8px_24px_rgba(10,132,255,0.35)] transition-[transform,background-color] hover:scale-[1.02] hover:bg-[#0974df]"
+                >
+                  <ShoppingBag className="size-4" />
+                  Get Sidenote — ${PRICE_USD}
+                </a>
+              </div>
+              <div className="rounded-[22px] border border-[#0a84ff]/15 bg-[#0a84ff]/[0.04] p-6">
+                <p className="text-[13px] font-semibold tracking-tight text-[#6e6e73] dark:text-[#a1a1a6]">
+                  AI, optional
+                </p>
+                <p className="mt-1 text-[40px] leading-none font-bold tracking-[-0.04em]">
+                  ${AI_MONTHLY_USD}
+                  <span className="ml-1.5 text-[15px] font-medium tracking-normal text-[#8a8a8a]">/ month</span>
+                </p>
+                <ul className="mt-5 space-y-2 text-[14px] text-[#333] dark:text-[#d5d5d7]">
+                  {[
+                    "Explain any message — slang, tone, in-jokes",
+                    "Ask about a whole conversation, years back",
+                    "Look things up, with the web and your history",
+                    "Reply drafts in your voice",
+                    "Turn on or off inside the app, any time",
+                    "Only the message you ask about is sent",
+                  ].map((line) => (
+                    <li key={line} className="flex items-start gap-2">
+                      <Check className="mt-[3px] size-3.5 shrink-0 text-[#0a84ff]" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-6 flex h-11 items-center justify-center rounded-full border border-[#0a84ff]/20 px-6 text-[13.5px] font-medium text-[#0a84ff]">
+                  Added from Settings → AI after you install
+                </p>
+              </div>
+            </div>
+            <p className="mt-5 text-[12.5px] text-[#8a8a8a] dark:text-[#7c7c80]">
+              Secure checkout by Stripe · Mac with Apple silicon (2021 or later) · Cancel AI whenever
+            </p>
+          </div>
+        </Reveal>
+
         {/* What's new */}
         <Reveal className="mx-auto mb-20 max-w-2xl">
           <div id="changelog" className="rounded-[28px] bg-white p-8 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
@@ -459,6 +526,10 @@ export function LandingPage() {
       <footer className="pb-10 text-center text-[12px] text-[#8a8a8a] dark:text-[#7c7c80]">
         Made for macOS · Your messages are indexed and searched on your Mac · Anonymous usage
         stats, never message content
+        <span className="mx-2">·</span>
+        <a href={AGAIN_URL} className="underline underline-offset-2 hover:text-[#111] dark:hover:text-[#f5f5f7]">
+          Download again
+        </a>
       </footer>
     </div>
   );

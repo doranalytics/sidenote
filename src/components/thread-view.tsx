@@ -15,6 +15,7 @@ import {
   Reply,
   Search,
   Sparkles,
+  MousePointerClick,
   X,
 } from "lucide-react";
 import type { Message, Reaction, SearchResult, Thread } from "@/lib/types";
@@ -65,6 +66,28 @@ export function ThreadView({
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; m: Message } | null>(null);
+  // Demo only: a "Right-click here" callout floating over the messages until
+  // the first menu opens. Once per browser session — switching threads should
+  // not bring the hand-holding back.
+  const [coach, setCoach] = useState(false);
+  useEffect(() => {
+    if (!demo) return;
+    try {
+      if (sessionStorage.getItem("sidenote-coach-done") === "1") return;
+    } catch {
+      // storage blocked — just show it
+    }
+    const t = setTimeout(() => setCoach(true), 700);
+    return () => clearTimeout(t);
+  }, [demo]);
+  const coachDone = useCallback(() => {
+    setCoach(false);
+    try {
+      sessionStorage.setItem("sidenote-coach-done", "1");
+    } catch {
+      // fine
+    }
+  }, []);
   const [explain, setExplain] = useState<{
     m: Message;
     mode: ExplainMode;
@@ -396,7 +419,41 @@ export function ThreadView({
       )}
 
       {/* messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {coach && !menu && !loading && messages.length > 0 && (
+          <div className="pointer-events-none sticky top-[38%] z-20 flex justify-center">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open the menu on the most recent message from the other
+                // person — the one most worth asking about — right where it is.
+                const target =
+                  [...messages].reverse().find((m) => !m.isFromMe && m.text) ??
+                  messages[messages.length - 1];
+                const el = scrollRef.current?.querySelector(`[data-mid="${target.id}"]`);
+                const r = el?.getBoundingClientRect();
+                setMenu({
+                  x: Math.min(r ? r.left + 48 : window.innerWidth / 2 - 100, window.innerWidth - 216),
+                  y: Math.min(r ? r.top + 8 : window.innerHeight / 2, window.innerHeight - 216),
+                  m: target,
+                });
+                coachDone();
+              }}
+              className={cn(
+                "pointer-events-auto flex items-center gap-2 rounded-full bg-[#0a84ff] py-2.5 pr-4 pl-3",
+                "text-[13px] font-medium text-white shadow-[0_12px_36px_rgba(10,132,255,0.45)]",
+                "ring-4 ring-[#0a84ff]/20 transition-transform hover:scale-[1.03]"
+              )}
+            >
+              <span className="relative flex size-5 items-center justify-center">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-white/70" />
+                <MousePointerClick className="relative size-4" />
+              </span>
+              Right-click any message — try it
+            </button>
+          </div>
+        )}
         {loading ? (
           <div className="space-y-3 pt-6">
             {[64, 40, 56, 32, 72, 48].map((w, i) => (
@@ -464,6 +521,7 @@ export function ThreadView({
                           y: Math.min(e.clientY, window.innerHeight - 216),
                           m,
                         });
+                        if (coach) coachDone();
                       }}
                       className={cn(
                         "group relative flex max-w-[78%] flex-col gap-1 md:max-w-[65%]",
@@ -488,6 +546,7 @@ export function ThreadView({
                               y: Math.min(r.bottom + 4, window.innerHeight - 216),
                               m,
                             });
+                            if (coach) coachDone();
                           }}
                           className={cn(
                             "absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-1",

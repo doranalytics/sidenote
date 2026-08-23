@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   CircleStop,
-  RefreshCw,
   MessageSquarePlus,
   Pencil,
   Send,
@@ -28,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { registerPasteTarget, type Pasted } from "@/lib/clipboard-image";
 import { Markdown } from "@/components/markdown";
+import { AiAccess } from "@/components/ai-access";
 
 type Entry = { role: "user" | "ai"; text: string };
 type JobState = { running: boolean; done: number; total: number; error?: string } | null;
@@ -48,32 +48,6 @@ export function AiPanel({
 }) {
   const demo = status?.mode === "demo";
   const registered = !!status?.ai?.configured;
-  const [code, setCode] = useState("");
-  const [redeeming, setRedeeming] = useState(false);
-  const [codeError, setCodeError] = useState<string | null>(null);
-
-  const redeem = async () => {
-    const value = code.trim();
-    if (!value) return;
-    setRedeeming(true);
-    setCodeError(null);
-    try {
-      const res = await fetch("/api/ai/access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: value }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't check that code.");
-      // The status poll in the app shell picks the change up; reload so every
-      // AI surface unlocks at once.
-      window.location.reload();
-    } catch (e) {
-      setCodeError((e as Error).message);
-    } finally {
-      setRedeeming(false);
-    }
-  };
   const [entries, setEntries] = useState<Entry[]>([]);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -379,30 +353,17 @@ export function AiPanel({
     return (
       <SetupShell
         title="Turn on AI"
-        body="Enter the invite code you were given. One time, then AI works everywhere in Sidenote."
+        body="Ask about any conversation, explain any message, draft replies."
       >
-        <div className="mt-1 flex w-full max-w-[260px] items-center gap-2">
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") redeem();
-            }}
-            placeholder="Invite code"
-            autoComplete="off"
-            spellCheck={false}
-            className="h-9 flex-1 text-[13px]"
-          />
-          <Button
-            size="sm"
-            onClick={redeem}
-            disabled={redeeming || !code.trim()}
-            className="h-9 shrink-0 rounded-lg bg-[#0a84ff] text-[12.5px] hover:bg-[#0974df]"
-          >
-            {redeeming ? <RefreshCw className="size-3.5 animate-spin" /> : "Turn on"}
-          </Button>
-        </div>
-        {codeError && <p className="text-[12.5px] text-red-500">{codeError}</p>}
+        <AiAccess
+          variant="panel"
+          className="mt-1 w-full"
+          // The status poll in the app shell picks the change up; reload so
+          // every AI surface unlocks at once.
+          onChange={(a) => {
+            if (a.ai || a.ownKey) window.location.reload();
+          }}
+        />
       </SetupShell>
     );
   }

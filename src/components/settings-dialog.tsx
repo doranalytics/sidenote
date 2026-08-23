@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowUpCircle, Check, ExternalLink, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowUpCircle, RefreshCw, Sparkles } from "lucide-react";
 import type { AppStatus, UpdateInfo } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AiAccess } from "@/components/ai-access";
 import {
   Dialog,
   DialogContent,
@@ -157,56 +157,6 @@ export function SettingsDialog({
   onUpdate?: () => void;
   onCheckUpdate?: () => Promise<UpdateInfo | null>;
 }) {
-  type Access = { registered: boolean; ownKey: boolean };
-  const [access, setAccess] = useState<Access | null>(null);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
-
-  const loadAccess = async () => {
-    try {
-      setAccess((await fetch("/api/ai/access").then((r) => r.json())) as Access);
-    } catch {
-      // offline or mid-restart — the section falls back to the empty state
-    }
-  };
-
-  useEffect(() => {
-    if (open && status?.mode === "local") loadAccess();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  const redeem = async () => {
-    const value = draft.trim();
-    if (!value) return;
-    setSaving(true);
-    setKeyError(null);
-    try {
-      const res = await fetch("/api/ai/access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: value }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't check that code.");
-      setAccess(data as Access);
-      setDraft("");
-    } catch (e) {
-      setKeyError((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const forget = async () => {
-    setKeyError(null);
-    try {
-      setAccess((await fetch("/api/ai/access", { method: "DELETE" }).then((r) => r.json())) as Access);
-    } catch (e) {
-      setKeyError((e as Error).message);
-    }
-  };
-
   const isDemo = status?.mode === "demo";
 
   return (
@@ -228,53 +178,9 @@ export function SettingsDialog({
                 This is the demo. On your Mac, right-click any message and Sidenote explains it
                 using the conversation around it.
               </p>
-            ) : access?.registered ? (
-              <>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                  {access.ownKey
-                    ? "Running on your own Anthropic key, billed to you."
-                    : "AI is on. Explaining a message sends only the few messages around it, and only when you ask — the rest of your archive stays on this Mac."}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={forget}
-                  className="mt-3 h-8 rounded-lg text-[12.5px]"
-                >
-                  <Trash2 className="mr-1.5 size-3.5" />
-                  Use a different code
-                </Button>
-              </>
             ) : (
-              <>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                  Enter your invite code to turn on AI. One time, then it works everywhere in
-                  Sidenote.
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <Input
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") redeem();
-                    }}
-                    placeholder="Invite code"
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="h-9 flex-1 text-[13px]"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={redeem}
-                    disabled={saving || !draft.trim()}
-                    className="h-9 shrink-0 rounded-lg bg-[#0a84ff] text-[12.5px] hover:bg-[#0974df]"
-                  >
-                    {saving ? <RefreshCw className="size-3.5 animate-spin" /> : "Turn on"}
-                  </Button>
-                </div>
-              </>
+              <AiAccess />
             )}
-            {keyError && <p className="mt-2.5 text-[12.5px] text-red-500">{keyError}</p>}
           </section>
 
           {/* ---------- Getting back in ---------- */}

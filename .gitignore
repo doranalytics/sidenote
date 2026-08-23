@@ -44,3 +44,6 @@ next-env.d.ts
 .vercel-svntso
 sidenote.log
 Sidenote Engine
+
+# supabase CLI scratch
+supabase/.temp/

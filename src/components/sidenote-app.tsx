@@ -67,6 +67,19 @@ export function SidenoteApp() {
     refresh();
   }, [refresh]);
 
+  // The demo opens straight onto a conversation — the featured one — so the
+  // first thing a visitor sees is messages, not an empty pane asking them to
+  // pick. Desktop only: on a phone the thread replaces the list, and landing
+  // inside one with no visible way back is worse than a tap.
+  useEffect(() => {
+    if (status?.mode !== "demo" || active || threads.length === 0) return;
+    if (window.matchMedia("(max-width: 767px)").matches) return;
+    const featured = threads.find((t) => t.id === "demo-maya") ?? threads[0];
+    setActive({ threadId: featured.id, messageId: null });
+    // Only on arrival — if they go back to the list, leave them there.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.mode, threads.length]);
+
   // Finish the Full Disk Access flow: after the guide restarts the server,
   // sync kicks off on its own so the user never has to know to re-click it.
   useEffect(() => {
