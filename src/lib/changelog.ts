@@ -10,6 +10,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "Aug 23, 2026",
+    title: "Sidenote has an account now — and AI is built in",
+    points: [
+      "Unlock once by signing in with the email you got Sidenote with — a 6-digit code arrives by email, no password, and this Mac stays unlocked",
+      "AI no longer needs your own API key: turn it on in Settings → AI ($10/month, cancel any time) and Explain, Look up, Reply drafts, and Ask-a-thread just work",
+      "Manage or cancel the AI subscription right from Settings; your own Anthropic key still works as before if you prefer it",
+      "Download your copy again any time at sidenote.lol/download — sign in with the same email",
+      "Existing invite-code users: nothing changes for you — your access carries over, no account needed",
+    ],
+  },
+  {
     date: "Aug 8, 2026",
     title: "Right-click any message and ask what it means",
     points: [
