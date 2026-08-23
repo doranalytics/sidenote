@@ -44,6 +44,10 @@ TAG="v$VERSION-$BUILD_NUM"
 
 step "Uploading ${TAG} to the private release store…"
 # `supabase link` once (project ref dvmpjltqemrrrbrbmnhf) and this just works.
+# cp refuses to overwrite, so the previous build is removed first.
+for f in Sidenote.dmg Sidenote.zip; do
+  yes | supabase storage rm "ss:///releases/$f" --experimental >/dev/null 2>&1 || true
+done
 supabase storage cp "$DMG" ss:///releases/Sidenote.dmg --experimental
 supabase storage cp "$ZIP" ss:///releases/Sidenote.zip --experimental
 

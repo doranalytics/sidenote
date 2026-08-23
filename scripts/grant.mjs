@@ -33,14 +33,20 @@ if (flag === "--revoke") {
   process.exit(0);
 }
 
-const { error } = await db.from("purchases").insert({
-  email: clean,
-  source: "manual",
-  livemode: true,
-  status: "paid",
-  amount_cents: 0,
-});
-if (error) throw error;
+// The app, and AI with it — a manual grant is "everything on."
+for (const row of [
+  { kind: "app", status: "paid" },
+  { kind: "ai", status: "active" },
+]) {
+  const { error } = await db.from("purchases").insert({
+    email: clean,
+    source: "manual",
+    livemode: true,
+    amount_cents: 0,
+    ...row,
+  });
+  if (error) throw error;
+}
 const { error: uerr } = await db.auth.admin.createUser({ email: clean, email_confirm: true });
 if (uerr && !/already|exists|registered/i.test(uerr.message)) throw uerr;
 console.log(`granted ${clean} — they can sign in with that email now`);
