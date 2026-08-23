@@ -332,12 +332,15 @@ export async function logDownload(email: string | null, file: string, via: strin
 
 // ---------- installs (the device cap) ----------
 
-/** How many Macs one purchase may have unlocked at once. */
-const INSTALL_LIMIT = Number(process.env.SIDENOTE_INSTALL_LIMIT ?? 3);
+/** How many Macs one purchase may have unlocked at once. One: it's a
+ *  personal license. Signing in on a new Mac moves it there — the previous
+ *  Mac locks within minutes — so an upgrade never needs support, and a
+ *  shared license is always kicking somebody out. */
+const INSTALL_LIMIT = Number(process.env.SIDENOTE_INSTALL_LIMIT ?? 1);
 
 /** Registers a fresh activation. If the license is already at the cap, the
  *  least-recently-seen Mac is revoked to make room — the honest owner with a
- *  new laptop just works; a shared license becomes musical chairs. */
+ *  new laptop just works; a shared license is always kicking somebody out. */
 export async function registerInstall(
   installId: string,
   email: string,
