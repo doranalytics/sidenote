@@ -230,7 +230,7 @@ export function friendlyError(e: Error): string {
       : "This copy of Sidenote is signed out. Sign in again in Settings → AI.";
   }
   if (status === 403 && !getApiKey()) {
-    return "This Sidenote account no longer has an active purchase.";
+    return "AI isn't on for this account. Turn it on in Settings → AI ($10/month).";
   }
   if (status === 503) return "Sidenote's AI service is unavailable right now.";
   if (status === 429) return "Too many requests — give it a moment.";
