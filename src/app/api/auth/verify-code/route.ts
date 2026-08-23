@@ -3,6 +3,7 @@ import {
   attachUser,
   entitlementFor,
   newInstallId,
+  registerInstall,
   signAccount,
   signDownload,
   supabaseAuth,
@@ -19,9 +20,13 @@ export async function POST(req: NextRequest) {
   if (!supabaseConfigured()) {
     return NextResponse.json({ error: "Sign-in isn't set up yet." }, { status: 503 });
   }
-  const { email, code } = (await req.json().catch(() => ({}))) as {
+  const { email, code, web } = (await req.json().catch(() => ({}))) as {
     email?: string;
     code?: string;
+    /** The re-download page sets this: a browser sign-in isn't a Mac and
+     *  shouldn't count against the device cap. The app (any build) doesn't,
+     *  so every real activation registers. */
+    web?: boolean;
   };
   const clean = (email ?? "").trim().toLowerCase();
   const digits = (code ?? "").replace(/\D/g, "");
@@ -47,9 +52,11 @@ export async function POST(req: NextRequest) {
     );
   }
   await attachUser(clean, data.user.id);
+  const installId = newInstallId();
+  if (!web) await registerInstall(installId, clean, data.user.id);
   return NextResponse.json({
     email: clean,
-    token: signAccount(newInstallId(), data.user.id),
+    token: signAccount(installId, data.user.id),
     download: signDownload(clean, "signin", 60 * 60_000),
     ai: ent.ai,
     aiStatus: ent.aiStatus,

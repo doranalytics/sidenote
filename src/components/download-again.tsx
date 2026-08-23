@@ -73,7 +73,7 @@ export function DownloadAgain() {
           <div className="mx-auto mt-8 max-w-md rounded-[28px] bg-white p-7 shadow-[0_2px_12px_rgba(10,60,120,0.04)] dark:bg-[#15171a]">
             <SignInForm
               sendCode={(email) => post("/api/auth/send-code", { email })}
-              verifyCode={(email, code) => post("/api/auth/verify-code", { email, code })}
+              verifyCode={(email, code) => post("/api/auth/verify-code", { email, code, web: true })}
               onSignedIn={(data: SignInResult, email) =>
                 setGrant({ email, download: String(data.download ?? "") })
               }

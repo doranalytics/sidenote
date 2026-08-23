@@ -330,6 +330,75 @@ export async function logDownload(email: string | null, file: string, via: strin
   }
 }
 
+// ---------- installs (the device cap) ----------
+
+/** How many Macs one purchase may have unlocked at once. */
+const INSTALL_LIMIT = Number(process.env.SIDENOTE_INSTALL_LIMIT ?? 3);
+
+/** Registers a fresh activation. If the license is already at the cap, the
+ *  least-recently-seen Mac is revoked to make room — the honest owner with a
+ *  new laptop just works; a shared license becomes musical chairs. */
+export async function registerInstall(
+  installId: string,
+  email: string,
+  userId: string
+): Promise<void> {
+  const db = supabaseAdmin();
+  const clean = email.trim().toLowerCase();
+  const { data } = await db
+    .from("installs")
+    .select("install_id,last_seen")
+    .eq("email", clean)
+    .eq("revoked", false)
+    .order("last_seen", { ascending: true });
+  const active = data ?? [];
+  const over = active.length - INSTALL_LIMIT + 1;
+  if (over > 0) {
+    const bump = active.slice(0, over).map((r) => r.install_id);
+    await db
+      .from("installs")
+      .update({ revoked: true })
+      .in("install_id", bump);
+    for (const id of bump) installVerdicts.delete(id);
+  }
+  await db.from("installs").insert({ install_id: installId, email: clean, user_id: userId });
+}
+
+type InstallRow = { install_id: string; revoked: boolean };
+
+/** Whether this install is still one of the licensed Macs. Rows are created
+ *  at activation; a token from before the cap existed gets a row on first
+ *  sight (grandfathered) — but a revoked row stays revoked. Cached alongside
+ *  the entitlement so it's one query every few minutes, not one per message. */
+async function installActive(i: Install): Promise<boolean> {
+  if (i.kind === "invite") return true;
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from("installs")
+    .select("install_id,revoked")
+    .eq("install_id", i.installId)
+    .maybeSingle();
+  const row = data as InstallRow | null;
+  if (row) {
+    if (row.revoked) return false;
+    void db
+      .from("installs")
+      .update({ last_seen: new Date().toISOString() })
+      .eq("install_id", i.installId)
+      .then(() => {});
+    return true;
+  }
+  // Pre-cap token: adopt it so it starts counting like everyone else.
+  const email = await emailForUser(i.userId);
+  if (!email) return false;
+  try {
+    await registerInstall(i.installId, email, i.userId);
+  } catch {
+    // a racing double-insert is fine — the row exists either way
+  }
+  return true;
+}
+
 // ---------- "what is this install allowed to do?" ----------
 
 // Invite tokens are allowed everything by virtue of verifying (the code list
@@ -340,6 +409,7 @@ export async function logDownload(email: string | null, file: string, via: strin
 const TTL = 3 * 60_000;
 const verdicts = new Map<string, { e: Entitlement; at: number }>();
 const userEmails = new Map<string, string>();
+export const installVerdicts = new Map<string, { ok: boolean; at: number }>();
 
 const OPEN: Entitlement = {
   email: "",
@@ -350,9 +420,29 @@ const OPEN: Entitlement = {
   stripeCustomerId: null,
 };
 
+const LOCKED: Entitlement = {
+  email: "",
+  app: false,
+  ai: false,
+  aiStatus: "revoked",
+  aiPeriodEnd: null,
+  stripeCustomerId: null,
+};
+
 export async function entitlementForInstall(i: Install, fresh = false): Promise<Entitlement> {
   if (i.kind === "invite") return OPEN;
   try {
+    // Device cap first: a bumped Mac is out regardless of the purchase.
+    const iv = installVerdicts.get(i.installId);
+    let ok: boolean;
+    if (!fresh && iv && Date.now() - iv.at < TTL) {
+      ok = iv.ok;
+    } else {
+      ok = await installActive(i);
+      if (installVerdicts.size > 5000) installVerdicts.clear();
+      installVerdicts.set(i.installId, { ok, at: Date.now() });
+    }
+    if (!ok) return LOCKED;
     let email = userEmails.get(i.userId);
     if (!email) {
       email = (await emailForUser(i.userId)) ?? undefined;
