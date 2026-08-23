@@ -122,7 +122,8 @@ export default async function Thanks({
             You&apos;re in.
           </h1>
           <p className="mx-auto mt-5 max-w-[46ch] text-[16px] leading-relaxed text-[#6b6b6b] md:text-[18px] dark:text-[#a1a1a6]">
-            Sidenote is yours, under{" "}
+            Sidenote is yours for good — one payment, every future update included. It&apos;s
+            registered under{" "}
             <span className="font-medium text-[#111] dark:text-[#f5f5f7]">{email}</span> — that&apos;s
             the email you&apos;ll sign in with inside the app, and where Stripe sends your receipts.
           </p>

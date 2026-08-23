@@ -197,7 +197,7 @@ export function LandingPage() {
             className="flex h-11 items-center gap-2 rounded-full bg-[#0a84ff] px-6 text-[14px] font-medium text-white shadow-[0_8px_24px_rgba(10,132,255,0.35)] transition-[transform,background-color] hover:scale-[1.03] hover:bg-[#0974df]"
           >
             <ShoppingBag className="size-4" />
-            Get Sidenote for macOS — ${PRICE_USD}
+            Get Sidenote for macOS — ${PRICE_USD} once
           </a>
           <a
             href="/demo"
@@ -420,8 +420,12 @@ export function LandingPage() {
               Pricing
             </p>
             <h2 className="mt-2 text-[30px] leading-[1.05] font-bold tracking-[-0.03em] md:text-[38px]">
-              Buy it once. Add AI if you want it.
+              Buy it once. Yours for life.
             </h2>
+            <p className="mx-auto mt-3 max-w-[48ch] text-[15px] leading-relaxed text-[#6e6e73] dark:text-[#a1a1a6]">
+              One payment, no subscription for the app — every update included, forever. AI is the
+              only monthly thing, and it&apos;s optional.
+            </p>
             <div className="mt-8 grid gap-4 text-left md:grid-cols-2">
               <div className="rounded-[22px] border border-black/[0.06] p-6 dark:border-white/10">
                 <p className="text-[13px] font-semibold tracking-tight text-[#6e6e73] dark:text-[#a1a1a6]">
@@ -429,7 +433,7 @@ export function LandingPage() {
                 </p>
                 <p className="mt-1 text-[40px] leading-none font-bold tracking-[-0.04em]">
                   ${PRICE_USD}
-                  <span className="ml-1.5 text-[15px] font-medium tracking-normal text-[#8a8a8a]">once</span>
+                  <span className="ml-1.5 text-[15px] font-medium tracking-normal text-[#8a8a8a]">one-time · lifetime</span>
                 </p>
                 <ul className="mt-5 space-y-2 text-[14px] text-[#333] dark:text-[#d5d5d7]">
                   {[
