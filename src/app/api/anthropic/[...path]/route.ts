@@ -14,7 +14,7 @@ export const maxDuration = 300;
 // Access is per install: a copy of Sidenote signs in once with the email it
 // was bought under (see /api/auth/*) and sends the resulting signed token
 // here. The token proves who; the purchases table (checked, cached) proves
-// their AI subscription is live — a lapse switches AI off within ten minutes.
+// their AI subscription is live — a lapse switches AI off within minutes.
 // Pre-paywall invite-code tokens still verify, so nobody's install breaks.
 //
 // ⚠️  Still not a hard boundary: whoever extracts a token from their own

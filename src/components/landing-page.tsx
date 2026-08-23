@@ -356,7 +356,7 @@ export function LandingPage() {
         </Reveal>
 
         {/* Feature cards */}
-        <div id="features" className="mt-5 grid gap-5 pb-16 text-left md:grid-cols-2">
+        <div id="features" className="mt-5 scroll-mt-28 grid gap-5 pb-16 text-left md:grid-cols-2">
           {[
             {
               img: "/shot-explain.png",
@@ -410,7 +410,7 @@ export function LandingPage() {
         {/* Pricing: two numbers. The app is bought once; AI is a monthly
             you can turn on and off from inside the app. */}
         <Reveal className="mx-auto mb-16 max-w-3xl">
-          <div id="pricing" className="rounded-[28px] bg-white p-8 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
+          <div id="pricing" className="scroll-mt-28 rounded-[28px] bg-white p-8 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
             <p className="text-[12px] font-semibold tracking-[0.12em] text-[#0a84ff] uppercase">
               Pricing
             </p>
@@ -485,7 +485,7 @@ export function LandingPage() {
 
         {/* What's new */}
         <Reveal className="mx-auto mb-20 max-w-2xl">
-          <div id="changelog" className="rounded-[28px] bg-white p-8 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
+          <div id="changelog" className="scroll-mt-28 rounded-[28px] bg-white p-8 shadow-[0_2px_12px_rgba(10,60,120,0.04)] md:p-10 dark:bg-[#15171a]">
             <p className="text-[12px] font-semibold tracking-[0.12em] text-[#0a84ff] uppercase">
               What&apos;s new
             </p>

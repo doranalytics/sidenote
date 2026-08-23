@@ -27,7 +27,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // The one thing the signature can't tell you is whether the purchase or the
 // subscription is still good (a refund, a lapsed card), so the relay and the
 // release endpoint also ask the database — cached, so it's one query every
-// ten minutes per person rather than one per message.
+// few minutes per person rather than one per message.
 
 const secret = () => process.env.SIDENOTE_SIGNING_SECRET ?? "";
 
@@ -334,10 +334,10 @@ export async function logDownload(email: string | null, file: string, via: strin
 
 // Invite tokens are allowed everything by virtue of verifying (the code list
 // is the revocation). Account tokens are resolved to an email and checked
-// against the table, with the answer remembered for ten minutes so a refund
-// or a lapsed subscription takes effect within the hour and a chatty session
+// against the table, with the answer remembered for three minutes so a refund
+// or a lapsed subscription takes effect almost at once and a chatty session
 // doesn't hit the database on every message.
-const TTL = 10 * 60_000;
+const TTL = 3 * 60_000;
 const verdicts = new Map<string, { e: Entitlement; at: number }>();
 const userEmails = new Map<string, string>();
 

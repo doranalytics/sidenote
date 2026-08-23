@@ -419,11 +419,18 @@ export function ThreadView({
       )}
 
       {/* messages */}
-      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {/* Out of the scroll flow on purpose: a sticky element inside the
+            list shifted the scroll position when it went away, and that
+            scroll closed the very menu it had just opened. */}
         {coach && !menu && !loading && messages.length > 0 && (
-          <div className="pointer-events-none sticky top-[38%] z-20 flex justify-center">
+          <div className="pointer-events-none absolute inset-x-0 top-[38%] z-20 flex justify-center">
             <button
               type="button"
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.currentTarget.click();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 // Open the menu on the most recent message from the other
@@ -450,10 +457,11 @@ export function ThreadView({
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-white/70" />
                 <MousePointerClick className="relative size-4" />
               </span>
-              Right-click any message — try it
+              Right-click here — or on any message
             </button>
           </div>
         )}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {loading ? (
           <div className="space-y-3 pt-6">
             {[64, 40, 56, 32, 72, 48].map((w, i) => (
@@ -656,6 +664,7 @@ export function ThreadView({
             )}
           </>
         )}
+      </div>
       </div>
 
       {/* compose */}
