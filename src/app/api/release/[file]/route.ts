@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { installOwnsApp, installFrom, logDownload, releaseUrl } from "@/lib/access";
+import { entitlementForInstall, installFrom, logDownload, releaseUrl } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +15,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ file: strin
       { status: 401 }
     );
   }
-  if (!(await installOwnsApp(install))) {
+  const ent = await entitlementForInstall(install);
+  if (!ent.app) {
     return NextResponse.json(
-      { error: "This Sidenote account no longer has an active purchase." },
+      {
+        error:
+          ent.aiStatus === "revoked"
+            ? "this Mac's license was moved to another Mac — sign in again to move it back"
+            : "This Sidenote account no longer has an active purchase.",
+      },
       { status: 403 }
     );
   }

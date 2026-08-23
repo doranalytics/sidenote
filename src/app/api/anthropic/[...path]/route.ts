@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { installHasAi, installLabel, verifyInstall } from "@/lib/access";
+import { entitlementForInstall, installLabel, verifyInstall } from "@/lib/access";
 import { meterJson, meterStream, report } from "@/lib/meter";
 
 export const dynamic = "force-dynamic";
@@ -57,9 +57,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ path: stri
       { status: 401 }
     );
   }
-  if (!(await installHasAi(install))) {
+  const ent = await entitlementForInstall(install);
+  if (!ent.ai) {
     return NextResponse.json(
-      { error: { message: "AI isn't on for this Sidenote account. Subscribe in Settings → AI." } },
+      {
+        error: {
+          message:
+            ent.aiStatus === "revoked"
+              ? "This Mac's license was moved when you signed in on another Mac. Sign in here again to move it back."
+              : "AI isn't on for this Sidenote account. Subscribe in Settings → AI.",
+        },
+      },
       { status: 403 }
     );
   }
